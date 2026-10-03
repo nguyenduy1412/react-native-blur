@@ -126,6 +126,10 @@ Nhận mọi prop của `View`, cộng thêm:
 - **Độ khớp màu:** Android xấp xỉ đường cong độ sáng của iOS bằng một ma trận màu, nên lệch trung bình khoảng 2/255. Riêng `systemChromeMaterial` lệch nhiều nhất, tới khoảng 23/255.
 - **Blur áp lên view con.** Muốn làm mờ nội dung nằm *phía sau* một lớp phủ, hãy đặt nội dung đó vào trong `BlurView` thay vì đặt một `BlurView` rỗng lên trên.
 
+## Ủng hộ
+
+⭐ Nếu thư viện giúp ích cho bạn, hãy cho một sao trên [GitHub](https://github.com/nguyenduy1412/react-native-blur) để nhiều người tìm thấy hơn.
+
 ## Giấy phép
 
 [MIT](./LICENSE) © nguyenduy1412

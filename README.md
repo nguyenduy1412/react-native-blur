@@ -214,6 +214,10 @@ Accepts every `View` prop, plus:
 
 Issues and pull requests are welcome at [github.com/nguyenduy1412/react-native-blur](https://github.com/nguyenduy1412/react-native-blur/issues). When reporting a visual issue, include the platform, OS version, the `tint` and `intensity` you used, and a screenshot.
 
+## Support
+
+⭐ If this library saves you time, a star on [GitHub](https://github.com/nguyenduy1412/react-native-blur) helps other developers find it.
+
 ## License
 
 [MIT](./LICENSE) © nguyenduy1412
