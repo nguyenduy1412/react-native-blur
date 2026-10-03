@@ -1,6 +1,6 @@
 {
   "name": "@nguyenduy1412/react-native-blur",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "High-performance native BlurView for Expo and React Native: RenderEffect on Android, UIVisualEffectView on iOS",
   "main": "build/index.js",
   "types": "build/index.d.ts",
@@ -9,6 +9,7 @@
   "files": [
     "build",
     "index.tsx",
+    "README.vi.md",
     "android",
     "ios",
     "expo-module.config.json",
