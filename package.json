@@ -56,8 +56,11 @@
   "bugs": {
     "url": "https://github.com/nguyenduy1412/react-native-blur/issues"
   },
-  "homepage": "https://github.com/nguyenduy1412/react-native-blur#readme",
-  "author": "nguyenduy1412",
+  "homepage": "https://kaizer-app.vercel.app",
+  "author": {
+    "name": "nguyenduy1412",
+    "url": "https://kaizer-app.vercel.app"
+  },
   "license": "MIT",
   "publishConfig": {
     "access": "public"

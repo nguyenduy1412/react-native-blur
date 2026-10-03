@@ -357,4 +357,4 @@ Issues and pull requests are welcome at [github.com/nguyenduy1412/react-native-b
 
 ## License
 
-[MIT](./LICENSE) © nguyenduy1412
+[MIT](./LICENSE) © [nguyenduy1412](https://kaizer-app.vercel.app)

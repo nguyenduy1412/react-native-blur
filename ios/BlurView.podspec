@@ -8,7 +8,7 @@ Pod::Spec.new do |s|
   s.summary        = package['description']
   s.description    = package['description']
   s.license        = package['license']
-  s.author         = package['author']
+  s.author         = package['author']['name']
   s.homepage       = package['homepage']
   s.platforms      = { :ios => '15.1' }
   s.source         = { :git => 'https://github.com/nguyenduy1412/react-native-blur.git', :tag => "v#{s.version}" }
