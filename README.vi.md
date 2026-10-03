@@ -47,6 +47,8 @@ Thư viện này sửa cả hai:
 npx expo install @nguyenduy1412/react-native-blur
 ```
 
+Hoặc dùng `npm install`, `yarn add`, `pnpm add`, `bun add` với cùng tên package.
+
 Thư viện có code native nên **không chạy trong Expo Go**. Bạn cần build lại development build:
 
 ```sh

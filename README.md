@@ -2,7 +2,7 @@
 
 # React Native Blur
 
-**Native blur for Expo and React Native that also blurs video.**
+**A React Native blur view for Expo and bare React Native that also blurs video.**
 
 Real iOS system materials on iOS, and the same materials rebuilt on Android with `RenderEffect`, calibrated against iOS colour for colour.
 
@@ -55,6 +55,18 @@ The same screen, four ways. Android and iOS from this library land on the same b
 ```sh
 npx expo install @nguyenduy1412/react-native-blur
 ```
+
+<details>
+<summary>npm, yarn, pnpm or bun</summary>
+
+```sh
+npm install @nguyenduy1412/react-native-blur
+yarn add @nguyenduy1412/react-native-blur
+pnpm add @nguyenduy1412/react-native-blur
+bun add @nguyenduy1412/react-native-blur
+```
+
+</details>
 
 This package contains native code, so it **does not run in Expo Go**. Rebuild your development build:
 
