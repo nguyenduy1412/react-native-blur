@@ -1,0 +1,145 @@
+import React from 'react';
+import { requireNativeModule, requireNativeView } from 'expo';
+import {
+  Platform,
+  View,
+  ViewProps,
+  ViewStyle,
+  StyleSheet,
+  StyleProp,
+} from 'react-native';
+
+export type BlurTint =
+  | 'light'
+  | 'dark'
+  | 'default'
+  | 'extraLight'
+  | 'prominent'
+  | 'systemUltraThinMaterial'
+  | 'systemThinMaterial'
+  | 'systemMaterial'
+  | 'systemThickMaterial'
+  | 'systemChromeMaterial';
+
+export interface BlurViewProps extends ViewProps {
+  intensity?: number;
+  tint?: BlurTint;
+  tintColor?: string;
+  blurRadius?: number;
+  saturation?: number;
+  borderRadius?: number;
+  children?: React.ReactNode;
+  style?: StyleProp<ViewStyle>;
+}
+
+export type CrystalBlurViewProps = BlurViewProps;
+
+interface NativeBlurViewProps extends ViewProps {
+  intensity?: number;
+  blurRadius?: number;
+  saturation?: number;
+  tint?: string;
+  tintColor?: string;
+  borderRadius?: number;
+}
+
+const NativeBlurView =
+  Platform.OS === 'ios' || Platform.OS === 'android'
+    ? requireNativeView<NativeBlurViewProps>('BlurView')
+    : null;
+
+export const BlurView: React.FC<BlurViewProps> = ({
+  intensity = 50,
+  tint = 'default',
+  tintColor,
+  blurRadius,
+  saturation,
+  borderRadius: customBorderRadius,
+  style,
+  children,
+  ...props
+}) => {
+  const flattenedStyle = (StyleSheet.flatten(style) || {}) as ViewStyle;
+  const computedBorderRadius =
+    customBorderRadius ??
+    (flattenedStyle.borderRadius as number) ??
+    0;
+
+  if (NativeBlurView) {
+    const nativeProps = {
+      intensity,
+      blurRadius,
+      saturation,
+      tint,
+      tintColor,
+      borderRadius: computedBorderRadius,
+    };
+    const containerStyle = [
+      styles.container,
+      style,
+      computedBorderRadius > 0 && {
+        borderRadius: computedBorderRadius,
+        overflow: 'hidden' as const,
+      },
+    ];
+
+    if (Platform.OS === 'ios') {
+      return (
+        <View style={containerStyle} {...props}>
+          {children}
+          <NativeBlurView
+            {...nativeProps}
+            style={StyleSheet.absoluteFill}
+            pointerEvents="none"
+          />
+        </View>
+      );
+    }
+
+    return (
+      <NativeBlurView
+        {...nativeProps}
+        style={containerStyle}
+        {...props}
+      >
+        {children}
+      </NativeBlurView>
+    );
+  }
+
+  return (
+    <View
+      style={[
+        styles.container,
+        {
+          // @ts-ignore
+          backdropFilter: `blur(${blurRadius || intensity * 0.3}px) saturate(${(saturation ?? 1.35) * 100}%)`,
+          backgroundColor:
+            tintColor ||
+            (tint === 'dark'
+              ? 'rgba(20, 20, 20, 0.6)'
+              : 'rgba(255, 255, 255, 0.4)'),
+        },
+        style,
+      ]}
+      {...props}
+    >
+      {children}
+    </View>
+  );
+};
+
+export const CrystalBlurView = BlurView;
+
+export function dumpGlassInternals(): Record<string, unknown> {
+  if (Platform.OS !== 'ios') return {};
+  return requireNativeModule('BlurView').dumpGlassInternals();
+}
+
+const styles = StyleSheet.create({
+  container: {
+    backgroundColor: 'transparent',
+  },
+});
+
+export default BlurView;
