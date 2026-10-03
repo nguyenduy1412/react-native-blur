@@ -1,6 +1,6 @@
 {
   "name": "@nguyenduy1412/react-native-blur",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "description": "React Native blur view for Expo and bare React Native that also blurs video. Native iOS materials (UIVisualEffectView) and Android RenderEffect blur matched to iOS.",
   "main": "build/index.js",
   "types": "build/index.d.ts",
