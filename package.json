@@ -1,7 +1,7 @@
 {
   "name": "@nguyenduy1412/react-native-blur",
   "version": "1.1.0",
-  "description": "React Native blur view for Expo and bare React Native that also blurs video. Native iOS materials (UIVisualEffectView) and Android RenderEffect blur matched to iOS.",
+  "description": "React Native blur view for Expo and bare React Native: backdrop blur and frosted glass for headers, tab bars, cards and popups, plus content and video blur. Native iOS materials and Android RenderEffect matched to iOS.",
   "main": "build/index.js",
   "types": "build/index.d.ts",
   "react-native": "index.tsx",
@@ -40,7 +40,14 @@
     "uivisualeffectview",
     "rendereffect",
     "ios",
-    "android"
+    "android",
+    "backdrop",
+    "backdrop-filter",
+    "blur-background",
+    "frosted-glass-effect",
+    "glass-effect",
+    "sticky-header",
+    "tab-bar"
   ],
   "repository": {
     "type": "git",

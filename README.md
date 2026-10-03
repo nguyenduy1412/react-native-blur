@@ -2,51 +2,34 @@
 
 # React Native Blur
 
-**A React Native blur view for Expo and bare React Native that also blurs video.**
+**Backdrop blur and frosted glass for React Native and Expo, on iOS and Android.**
 
-Real iOS system materials on iOS, and the same materials rebuilt on Android with `RenderEffect`, calibrated against iOS colour for colour.
+Blur what is behind headers, tab bars, cards, popups and buttons while their content stays sharp. Blur a whole screen or a playing video. Real iOS materials on iOS, and the same materials rebuilt on Android with `RenderEffect`, matched to iOS colour for colour.
 
 [![npm version](https://img.shields.io/npm/v/@nguyenduy1412/react-native-blur.svg?style=flat-square)](https://www.npmjs.com/package/@nguyenduy1412/react-native-blur)
 [![npm downloads](https://img.shields.io/npm/dm/@nguyenduy1412/react-native-blur.svg?style=flat-square)](https://www.npmjs.com/package/@nguyenduy1412/react-native-blur)
 [![license](https://img.shields.io/npm/l/@nguyenduy1412/react-native-blur.svg?style=flat-square)](./LICENSE)
 ![platforms](https://img.shields.io/badge/platforms-iOS%20%7C%20Android%20%7C%20Web-blue?style=flat-square)
 
-<img src="https://raw.githubusercontent.com/nguyenduy1412/react-native-blur/main/.github/assets/video-comparison.webp" width="720" alt="Left: this library blurs the playing video. Right: a typical blur library lets the video show through sharp." />
+<img src="https://raw.githubusercontent.com/nguyenduy1412/react-native-blur/main/.github/assets/backdrop-demo.webp" width="760" alt="Backdrop blur on iOS and Android: a frosted button over a playing video, a frosted popup over a map, and a frosted sticky header over a scrolling list" />
 
-<sub><b>Left:</b> this library. The video behind the glass is blurred like everything else.<br/><b>Right:</b> a typical React Native blur library. Blur is on, but the video stays sharp.</sub>
+<sub>Backdrop mode, recorded on the iOS simulator (left) and an Android emulator (right). The button blurs the video under it, the popup blurs the map, and the header blurs the list scrolling beneath it.</sub>
 
 </div>
 
 ---
 
-## Why another blur library?
-
-Most blur libraries for React Native look fine over a static screen and break down in two places.
-
-**Video escapes the blur.** On Android, video plays in a `SurfaceView`, which the system composites directly on top of your app's window. Libraries that blur by taking a snapshot of the view tree never see that layer, so the video stays perfectly sharp behind your "glass".
-
-**Android looks grey and flat.** A single Gaussian blur plus a flat tint washes the colour out. Light and shadow merge into one grey smear, and the result looks nothing like the iOS material on the same screen.
-
-This library fixes both:
-
-<div align="center">
-<img src="https://raw.githubusercontent.com/nguyenduy1412/react-native-blur/main/.github/assets/blur-comparison.jpg" width="100%" alt="The same screen with no blur, this library on Android, this library on iOS, and expo-blur on Android" />
-</div>
-
-The same screen, four ways. Android and iOS from this library land on the same brightness, saturation and depth. The flat-tint approach (right) turns the same content into a grey wash.
-
-📖 **Deep dive with video:** [Kaizer Blur: real blur, even over video](https://kaizer-app.vercel.app) (see the *Library* section).
-
 ## Features
 
+- 🪟 **Backdrop blur** (`mode="backdrop"`): frosted headers, tab bars, cards, popups and buttons that blur whatever is behind them, with sharp content on top. Works over scrolling lists and playing video.
 - 🎬 **Blurs video**, including `SurfaceView` players such as `expo-video` and `react-native-video` on Android.
 - 🍎 **Real iOS materials.** On iOS it is `UIVisualEffectView` with the system blur styles, not an imitation.
 - 🤖 **Android matched to iOS.** A `RenderEffect` chain (Gaussian blur, then a colour matrix) per material, calibrated against iOS screenshots: mean error **1.95 / 255** across 187 sampled colours.
-- ✨ **Glass edge.** A specular rim highlight on the top edge gives the "glass has thickness" look.
+- ✨ **Glass edge.** A specular rim highlight gives the "glass has thickness" look.
 - 🌗 **Light and dark aware.** Material tints follow the system appearance on Android.
 - 🎚️ **One `intensity` prop** from 0 to 100 drives blur, colour and rim together.
 - 🌐 **Web fallback** with CSS `backdrop-filter`.
-- 📦 **Tiny.** About 11 kB packed, no JS dependencies, built on the Expo Modules API.
+- 📦 **Small**, no JS dependencies, built on the Expo Modules API.
 
 ## Installation
 
@@ -87,88 +70,147 @@ npx expo run:android
 
 `BlurView` has two modes. Pick the one that matches what you want frosted.
 
-### `mode="backdrop"`: blur what is behind the view
-
-The classic frosted-glass overlay: headers, tab bars, cards, popups and buttons over content. Everything behind the `BlurView` is blurred, and its children stay sharp on top.
+| You want to blur… | Use |
+| --- | --- |
+| What is **behind** the view (overlays: header, tab bar, card, popup, button) | `mode="backdrop"` |
+| What is **inside** the view (a whole screen, an image, a playing video) | `mode="content"` (default) |
 
 ```tsx
 import BlurView from "@nguyenduy1412/react-native-blur";
 
-<View style={{ flex: 1 }}>
-  <ScrollView>{/* content scrolls under the header */}</ScrollView>
+<BlurView mode="backdrop" intensity={80} tint="systemThinMaterial" style={{ borderRadius: 24, padding: 16 }}>
+  <Text>Frosted card</Text>
+</BlurView>
 
-  <BlurView mode="backdrop" intensity={80} tint="systemMaterial" style={styles.header}>
-    <Text>Header</Text>
-  </BlurView>
-</View>
-```
-
-### `mode="content"` (default): blur what is inside the view
-
-Blurs the children themselves. Use it to frost a whole screen, an image or a playing video.
-
-```tsx
 <BlurView style={{ flex: 1 }} intensity={50} tint="systemMaterial">
   <YourContent />
 </BlurView>
 ```
 
-## Examples
+## Use cases
 
-### Toggle a blur over a whole screen
+### Frosted sticky header over a scrolling list
+
+```tsx
+<View style={{ flex: 1 }}>
+  <ScrollView contentContainerStyle={{ paddingTop: 96 }}>{items}</ScrollView>
+
+  <BlurView
+    mode="backdrop"
+    intensity={85}
+    tint="systemMaterial"
+    style={{ position: "absolute", top: 0, left: 0, right: 0, paddingTop: insets.top, paddingBottom: 12 }}
+  >
+    <Text>Inbox</Text>
+  </BlurView>
+</View>
+```
+
+### Glass tab bar or bottom bar
+
+```tsx
+<BlurView
+  mode="backdrop"
+  intensity={80}
+  tint="systemThinMaterial"
+  style={{ position: "absolute", left: 16, right: 16, bottom: 24, borderRadius: 32, flexDirection: "row" }}
+>
+  {tabs}
+</BlurView>
+```
+
+### Frosted button over a video
+
+Only the button area is blurred and the rest of the video stays sharp. On Android, render the video with a `TextureView` for backdrop mode.
+
+```tsx
+<View style={{ flex: 1 }}>
+  <VideoView player={player} surfaceType="textureView" style={StyleSheet.absoluteFill} />
+
+  <BlurView mode="backdrop" intensity={85} tint="dark" style={{ borderRadius: 999, paddingVertical: 12, alignItems: "center" }}>
+    <Text style={{ color: "white" }}>Play</Text>
+  </BlurView>
+</View>
+```
+
+### Popup or card over a map
+
+On Android the map must render into a regular view or a `TextureView`; a map drawn into a `SurfaceView` is invisible to backdrop mode.
+
+```tsx
+<View style={{ flex: 1 }}>
+  <MapView style={StyleSheet.absoluteFill} />
+
+  <BlurView mode="backdrop" intensity={75} tint="light" style={{ margin: 16, borderRadius: 18, padding: 16 }}>
+    <Text>Café · 300 m away</Text>
+  </BlurView>
+</View>
+```
+
+### Blurred background behind a modal
+
+Render the overlay in the same screen and put a backdrop `BlurView` behind its content.
+
+```tsx
+{visible && (
+  <View style={StyleSheet.absoluteFill}>
+    <BlurView mode="backdrop" intensity={60} style={StyleSheet.absoluteFill} />
+    <ModalCard />
+  </View>
+)}
+```
+
+### Blur a whole screen
 
 Keep the content mounted and drive `intensity`. `0` turns the effect off completely.
 
 ```tsx
-const [blurred, setBlurred] = useState(false);
-
-<BlurView style={{ flex: 1 }} intensity={blurred ? 60 : 0}>
+<BlurView style={{ flex: 1 }} intensity={locked ? 60 : 0}>
   <Feed />
-</BlurView>;
-```
-
-### Frosted card
-
-`borderRadius` clips the blur, the tint and the rim together. It is also read from `style.borderRadius`.
-
-```tsx
-<BlurView
-  intensity={70}
-  tint="systemThinMaterial"
-  style={{ borderRadius: 24, padding: 20 }}
->
-  <Text>Frosted glass</Text>
 </BlurView>
 ```
 
 ### Blur a playing video
 
-Nothing special is needed. `SurfaceView` players are picked up automatically.
+Content mode picks up `SurfaceView` players automatically.
 
 ```tsx
-import { useVideoPlayer, VideoView } from "expo-video";
-
-const player = useVideoPlayer(source, (p) => p.play());
-
 <BlurView style={{ flex: 1 }} intensity={60}>
   <VideoView player={player} style={{ flex: 1 }} />
-</BlurView>;
+</BlurView>
 ```
 
-### Custom tint colour and stronger blur (Android)
+### Custom tint colour and stronger blur
 
 ```tsx
-<BlurView
-  intensity={80}
-  tint="dark"
-  tintColor="rgba(10, 20, 40, 0.35)"
-  blurRadius={30}
-  saturation={1.4}
-  style={{ flex: 1 }}
->
+<BlurView intensity={80} tint="dark" tintColor="rgba(10, 20, 40, 0.35)" blurRadius={30} saturation={1.4} style={{ flex: 1 }}>
   <Content />
 </BlurView>
 ```
+
+## Why another blur library?
+
+Most blur libraries for React Native look fine over a static screen and break down in three places.
+
+**Overlays often don't blur what is behind them on Android.** Putting a blur view over content is the most common use, and it is where many Android blur setups break. Backdrop mode records what is drawn behind the view and blurs it, so headers, cards and popups behave the same on Android as on iOS.
+
+**Video escapes the blur.** On Android, video plays in a `SurfaceView`, which the system composites directly on top of your app's window. Libraries that blur by taking a snapshot of the view tree never see that layer, so the video stays perfectly sharp behind your "glass".
+
+<div align="center">
+<img src="https://raw.githubusercontent.com/nguyenduy1412/react-native-blur/main/.github/assets/video-comparison.webp" width="600" alt="Left: this library blurs the playing video. Right: a typical blur library lets the video show through sharp." />
+
+<sub><b>Left:</b> this library. The video is blurred like everything else. <b>Right:</b> a typical React Native blur library. Blur is on, but the video stays sharp.</sub>
+</div>
+
+**Android looks grey and flat.** A single Gaussian blur plus a flat tint washes the colour out. Light and shadow merge into one grey smear, and the result looks nothing like the iOS material on the same screen.
+
+<div align="center">
+<img src="https://raw.githubusercontent.com/nguyenduy1412/react-native-blur/main/.github/assets/blur-comparison.jpg" width="100%" alt="The same screen with no blur, this library on Android, this library on iOS, and expo-blur on Android" />
+</div>
+
+The same screen, four ways. Android and iOS from this library land on the same brightness, saturation and depth. The flat-tint approach (right) turns the same content into a grey wash.
+
+📖 **Deep dive with video:** [Kaizer Blur: real blur, even over video](https://kaizer-app.vercel.app) (see the *Library* section).
 
 ## API
 
@@ -204,9 +246,9 @@ Accepts every `View` prop, plus:
 
 ## How it works
 
-**iOS.** A `UIVisualEffectView` with the matching `UIBlurEffect` style sits over the children. `intensity` is applied by scrubbing a paused `UIViewPropertyAnimator`, so every value between 0 and 100 is a real system blur rather than an opacity fade. A specular highlight layer draws the glass edge.
+**iOS.** A `UIVisualEffectView` with the matching `UIBlurEffect` style sits over the children in content mode, and underneath them in backdrop mode. `intensity` is applied by scrubbing a paused `UIViewPropertyAnimator`, so every value between 0 and 100 is a real system blur rather than an opacity fade. A specular highlight layer draws the glass edge.
 
-**Android (API 31+).** The view applies a `RenderEffect` chain to its children: a Gaussian blur, then a `ColorMatrix` that restores the brightness and saturation the blur removes and lays down the material's tint plate. The material numbers come from Apple's own `.materialrecipe` files in the iOS runtime, and `scripts/check-material-recipes.py` checks the Android output against colours sampled from iOS screenshots.
+**Android (API 31+).** In content mode the view applies a `RenderEffect` chain to its children: a Gaussian blur, then a `ColorMatrix` that restores the brightness and saturation the blur removes and lays down the material's tint plate. The material numbers come from Apple's own `.materialrecipe` files in the iOS runtime, and `scripts/check-material-recipes.py` checks the Android output against colours sampled from iOS screenshots.
 
 **Video on Android.** A `SurfaceView` is composited by the system, outside the normal view hierarchy, so no `RenderEffect` can reach it. The view finds `SurfaceView`s among its children, copies their frames with `PixelCopy` (downscaled 4×, about 30 fps) and draws the copy in their place, where the blur applies like it does to everything else.
 
