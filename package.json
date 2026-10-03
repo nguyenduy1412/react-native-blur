@@ -1,6 +1,6 @@
 {
   "name": "@nguyenduy1412/react-native-blur",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "React Native blur view for Expo and bare React Native: backdrop blur and frosted glass for headers, tab bars, cards and popups, plus content and video blur. Native iOS materials and Android RenderEffect matched to iOS.",
   "main": "build/index.js",
   "types": "build/index.d.ts",
