@@ -21,7 +21,10 @@ export type BlurTint =
   | 'systemThickMaterial'
   | 'systemChromeMaterial';
 
+export type BlurMode = 'content' | 'backdrop';
+
 export interface BlurViewProps extends ViewProps {
+  mode?: BlurMode;
   intensity?: number;
   tint?: BlurTint;
   tintColor?: string;
@@ -35,6 +38,7 @@ export interface BlurViewProps extends ViewProps {
 export type CrystalBlurViewProps = BlurViewProps;
 
 interface NativeBlurViewProps extends ViewProps {
+  mode?: BlurMode;
   intensity?: number;
   blurRadius?: number;
   saturation?: number;
@@ -49,6 +53,7 @@ const NativeBlurView =
     : null;
 
 export const BlurView: React.FC<BlurViewProps> = ({
+  mode = 'content',
   intensity = 50,
   tint = 'default',
   tintColor,
@@ -67,6 +72,7 @@ export const BlurView: React.FC<BlurViewProps> = ({
 
   if (NativeBlurView) {
     const nativeProps = {
+      mode,
       intensity,
       blurRadius,
       saturation,
@@ -83,15 +89,24 @@ export const BlurView: React.FC<BlurViewProps> = ({
       },
     ];
 
-    if (Platform.OS === 'ios') {
+    if (Platform.OS === 'ios' || mode === 'backdrop') {
       return (
         <View style={containerStyle} {...props}>
+          {mode === 'backdrop' && (
+            <NativeBlurView
+              {...nativeProps}
+              style={StyleSheet.absoluteFill}
+              pointerEvents="none"
+            />
+          )}
           {children}
-          <NativeBlurView
-            {...nativeProps}
-            style={StyleSheet.absoluteFill}
-            pointerEvents="none"
-          />
+          {mode !== 'backdrop' && (
+            <NativeBlurView
+              {...nativeProps}
+              style={StyleSheet.absoluteFill}
+              pointerEvents="none"
+            />
+          )}
         </View>
       );
     }

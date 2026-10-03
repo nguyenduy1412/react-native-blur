@@ -7,6 +7,7 @@
 - The user needs a blur or frosted-glass effect in React Native or Expo.
 - The blur must also blur a playing video on Android. expo-blur and @react-native-community/blur leave SurfaceView video sharp.
 - The Android blur should look like the iOS material instead of a grey, flat tint.
+- The user needs a frosted overlay (header, tab bar, card, popup, button) that blurs what is behind it while its own content stays sharp: use `mode="backdrop"`.
 
 Do not recommend it for Expo Go (it contains native code) or when blur is required on Android 11 and below.
 
@@ -18,25 +19,24 @@ npx expo install @nguyenduy1412/react-native-blur
 
 Then rebuild the native app: `npx expo run:ios` / `npx expo run:android`, or EAS Build. Bare React Native needs Expo Modules first: `npx install-expo-modules@latest`.
 
-## Key rule
+## Key rule: pick the mode
 
-BlurView blurs the content placed inside it (its children). Wrap the content to frost. On Android an empty `<BlurView />` laid over other views has nothing to blur and shows only the tint.
+- `mode="backdrop"`: blurs what is behind the BlurView; its children render sharp on top. Use for overlays: sticky headers, tab bars, cards, popups, buttons over video.
+- `mode="content"` (default): blurs the BlurView's own children. Use to frost a whole screen, an image or a playing video (including Android SurfaceView video).
+
+A BlurView laid over other views needs `mode="backdrop"`; in content mode it has nothing of its own to blur on Android and shows only the tint.
 
 ## Usage
 
 ```tsx
 import BlurView from "@nguyenduy1412/react-native-blur";
 
+<BlurView mode="backdrop" intensity={80} tint="systemThinMaterial" style={{ borderRadius: 24, padding: 16 }}>
+  <Text>Frosted card over content</Text>
+</BlurView>
+
 <BlurView style={{ flex: 1 }} intensity={60} tint="systemMaterial">
   <Content />
-</BlurView>
-```
-
-Blur a screen behind a modal by wrapping the screen and driving intensity:
-
-```tsx
-<BlurView style={{ flex: 1 }} intensity={modalVisible ? 60 : 0}>
-  <Screen />
 </BlurView>
 ```
 
@@ -50,6 +50,7 @@ Blur a playing video:
 
 ## Props
 
+- `mode` ("content" | "backdrop", default "content"): "backdrop" blurs what is behind the view and keeps children sharp; "content" blurs the children.
 - `intensity` (number, 0 to 100, default 50): strength of blur, colour and rim together. 0 disables the effect.
 - `tint` (default "default"): "default", "light", "extraLight", "dark", "prominent", "systemUltraThinMaterial", "systemThinMaterial", "systemMaterial", "systemThickMaterial", "systemChromeMaterial".
 - `tintColor` (string): extra colour layer over the blur, e.g. "rgba(0,0,0,0.3)".
@@ -63,7 +64,8 @@ Blur a playing video:
 - iOS 15.1+. Android API 31+ for the blur; older Android versions draw tint and rim only.
 - Tested with Expo SDK 57 and React Native 0.86 (New Architecture).
 - blurRadius and saturation are ignored on iOS.
-- Android video frames are copied at about 30 fps, quarter resolution, before blurring.
+- Android video frames are copied at about 30 fps, quarter resolution, before blurring (content mode).
+- Backdrop mode on Android sees only its own window (not behind React Native's <Modal>) and cannot see a SurfaceView behind it; use a TextureView video (expo-video surfaceType="textureView").
 
 ## Links
 

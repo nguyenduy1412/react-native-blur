@@ -26,6 +26,9 @@ class BlurViewModule : Module() {
             Prop("borderRadius") { view: BlurView, radius: Double ->
                 view.setBorderRadius(radius)
             }
+            Prop("mode") { view: BlurView, mode: String ->
+                view.setMode(mode)
+            }
         }
     }
 }

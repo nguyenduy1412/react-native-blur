@@ -85,22 +85,33 @@ npx expo run:android
 
 ## Quick start
 
-`BlurView` blurs **the content you put inside it**. Wrap the screen or the part of the screen you want frosted:
+`BlurView` has two modes. Pick the one that matches what you want frosted.
+
+### `mode="backdrop"`: blur what is behind the view
+
+The classic frosted-glass overlay: headers, tab bars, cards, popups and buttons over content. Everything behind the `BlurView` is blurred, and its children stay sharp on top.
 
 ```tsx
 import BlurView from "@nguyenduy1412/react-native-blur";
 
-export default function Screen() {
-  return (
-    <BlurView style={{ flex: 1 }} intensity={50} tint="systemMaterial">
-      <YourContent />
-    </BlurView>
-  );
-}
+<View style={{ flex: 1 }}>
+  <ScrollView>{/* content scrolls under the header */}</ScrollView>
+
+  <BlurView mode="backdrop" intensity={80} tint="systemMaterial" style={styles.header}>
+    <Text>Header</Text>
+  </BlurView>
+</View>
 ```
 
-> [!IMPORTANT]
-> On Android the blur is applied to the view's **children**. An empty `<BlurView />` placed on top of other views has nothing to blur, so it only draws the tint and rim. Put the content you want blurred inside the `BlurView`.
+### `mode="content"` (default): blur what is inside the view
+
+Blurs the children themselves. Use it to frost a whole screen, an image or a playing video.
+
+```tsx
+<BlurView style={{ flex: 1 }} intensity={50} tint="systemMaterial">
+  <YourContent />
+</BlurView>
+```
 
 ## Examples
 
@@ -167,6 +178,7 @@ Accepts every `View` prop, plus:
 
 | Prop | Type | Default | Platforms | Description |
 | --- | --- | --- | --- | --- |
+| `mode` | `'content' \| 'backdrop'` | `'content'` | iOS, Android | `'backdrop'` blurs what is behind the view and keeps its children sharp. `'content'` blurs the children. |
 | `intensity` | `number` | `50` | iOS, Android, Web | Strength of the whole effect, `0` to `100`. Scales blur, colour and rim together. `0` disables it. |
 | `tint` | `BlurTint` | `'default'` | iOS, Android, Web | Material to use. See the table below. |
 | `tintColor` | `string` | — | iOS, Android, Web | Extra colour layer drawn over the blur, for example `'rgba(0,0,0,0.3)'`. |
@@ -198,6 +210,8 @@ Accepts every `View` prop, plus:
 
 **Video on Android.** A `SurfaceView` is composited by the system, outside the normal view hierarchy, so no `RenderEffect` can reach it. The view finds `SurfaceView`s among its children, copies their frames with `PixelCopy` (downscaled 4×, about 30 fps) and draws the copy in their place, where the blur applies like it does to everything else.
 
+**Backdrop mode.** On iOS the effect view is placed underneath the children, so `UIVisualEffectView` blurs whatever is behind the `BlurView`. On Android the view records what is drawn behind it (ancestor backgrounds and the sibling views before it, with their scroll offsets and transforms) into a `RenderNode`, applies the same blur and material chain, and draws the children on top. The recording is refreshed on every frame where something on screen changed, so scrolling lists and playing videos stay in sync.
+
 **Web.** CSS `backdrop-filter: blur() saturate()` with a tint background.
 
 ## Limitations
@@ -206,9 +220,23 @@ Accepts every `View` prop, plus:
 - **`blurRadius` and `saturation`** are ignored on iOS, which uses the system material as is.
 - **Video copies on Android** refresh at about 30 fps at quarter resolution. That is invisible once blurred, but you will notice it at a very low `intensity`.
 - **Colour fidelity:** Android fits each iOS luminance curve with a single colour matrix, so it averages about 2 / 255 off iOS. `systemChromeMaterial` is the outlier, at up to about 23 / 255.
-- **Blur applies to children.** To frost something drawn *behind* an overlay, render that content inside the `BlurView` instead of placing an empty `BlurView` on top.
+- **Backdrop mode on Android only sees its own window.** Inside React Native's `<Modal>` (a separate window) it cannot blur the screen behind; use an in-screen overlay instead.
+- **Backdrop mode on Android cannot see a `SurfaceView` behind it.** Render the video with a `TextureView` instead, for example `<VideoView surfaceType="textureView" />` in expo-video. Content mode blurs `SurfaceView` video fine.
 
 ## FAQ
+
+<details>
+<summary><b>How do I make a frosted header, tab bar or button over content?</b></summary>
+
+Use `mode="backdrop"`. The content behind the `BlurView` is blurred and its children stay sharp:
+
+```tsx
+<BlurView mode="backdrop" intensity={80} tint="systemThinMaterial" style={{ borderRadius: 24, padding: 16 }}>
+  <Text>Frosted card</Text>
+</BlurView>
+```
+
+</details>
 
 <details>
 <summary><b>expo-blur or <code>@react-native-community/blur</code> doesn't blur my video on Android. Why?</b></summary>
@@ -237,7 +265,7 @@ A single Gaussian blur plus a flat tint washes out the colours. This library reb
 
 Check two things:
 
-1. **The content must be inside the `BlurView`.** On Android the blur is applied to the view's children. An empty `<BlurView />` placed on top of other views has nothing to blur.
+1. **Use `mode="backdrop"` for overlays.** The default `mode="content"` blurs the view's own children, so a `BlurView` laid over other views has nothing of its own to blur. `mode="backdrop"` blurs what is behind it.
 2. **The device must run Android 12 (API 31) or later.** `RenderEffect` does not exist on older versions, so they get the tint and rim only.
 
 </details>
@@ -245,14 +273,21 @@ Check two things:
 <details>
 <summary><b>How do I blur the screen behind a modal or overlay?</b></summary>
 
-Render the screen inside a `BlurView` and drive `intensity` from your modal state. `0` turns the effect off completely.
+Render the overlay in the same screen (an absolutely positioned view, or a portal) and put a backdrop `BlurView` behind its content. The screen underneath is blurred and the overlay content stays sharp.
 
 ```tsx
-<BlurView style={{ flex: 1 }} intensity={modalVisible ? 60 : 0}>
+<View style={{ flex: 1 }}>
   <Screen />
-</BlurView>
-<MyModal visible={modalVisible} />
+  {visible && (
+    <View style={StyleSheet.absoluteFill}>
+      <BlurView mode="backdrop" intensity={60} style={StyleSheet.absoluteFill} />
+      <ModalCard />
+    </View>
+  )}
+</View>
 ```
+
+On Android, React Native's `<Modal>` opens a separate window, and backdrop mode only sees content in its own window. Inside a `<Modal>` it works on iOS but not on Android, so prefer an in-screen overlay when you need the blur on both platforms.
 
 </details>
 

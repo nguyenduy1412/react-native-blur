@@ -12,6 +12,7 @@ import android.graphics.Outline
 import android.graphics.Paint
 import android.graphics.RectF
 import android.graphics.RenderEffect
+import android.graphics.RenderNode
 import android.graphics.Shader
 import android.graphics.drawable.BitmapDrawable
 import android.os.Build
@@ -97,6 +98,8 @@ class BlurView(context: Context, appContext: AppContext) : ExpoView(context, app
     private var cornerRadius: Float = 0f
     private var blurEffect: RenderEffect? = null
     private var appliedEffect: RenderEffect? = null
+    private var backdropMode = false
+    private var backdropNode: RenderNode? = null
 
     private val surfaceMirrors = mutableMapOf<SurfaceView, SurfaceMirror>()
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -106,6 +109,7 @@ class BlurView(context: Context, appContext: AppContext) : ExpoView(context, app
     private val preDrawListener = ViewTreeObserver.OnPreDrawListener {
         applyChildEffects()
         surfaceMirrors.values.forEach(::syncSurfaceAlpha)
+        if (backdropMode && blurEffect != null) invalidate()
         true
     }
     private val mirrorFrameCallback = object : Choreographer.FrameCallback {
@@ -168,6 +172,12 @@ class BlurView(context: Context, appContext: AppContext) : ExpoView(context, app
         invalidate()
     }
 
+    fun setMode(mode: String) {
+        backdropMode = mode.equals("backdrop", ignoreCase = true)
+        applyEffects()
+        invalidate()
+    }
+
     fun setBorderRadius(radius: Double) {
         this.cornerRadius = radius.toFloat().coerceAtLeast(0f)
         updateOutline()
@@ -203,7 +213,7 @@ class BlurView(context: Context, appContext: AppContext) : ExpoView(context, app
     // ponytail: rescans the whole subtree on every global layout to find SurfaceViews (O(n) per layout);
     // upgrade path is an OnHierarchyChangeListener chain if the blurred tree gets large.
     private fun syncSurfaceMirrors() {
-        val found = if (blurEffect != null && isAttachedToWindow) collectSurfaceViews(this, mutableListOf()) else emptyList()
+        val found = if (blurEffect != null && !backdropMode && isAttachedToWindow) collectSurfaceViews(this, mutableListOf()) else emptyList()
         (surfaceMirrors.keys - found.toSet()).forEach(::releaseMirror)
         found.forEach { surfaceMirrors.getOrPut(it) { SurfaceMirror(it) } }
         if (surfaceMirrors.isEmpty()) stopMirrorLoop() else startMirrorLoop()
@@ -406,21 +416,82 @@ class BlurView(context: Context, appContext: AppContext) : ExpoView(context, app
     private fun applyChildEffects() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return
         val waitingForMirror = appliedEffect == null && surfaceMirrors.values.any { !it.ready }
-        appliedEffect = if (waitingForMirror) null else blurEffect
+        appliedEffect = if (backdropMode || waitingForMirror) null else blurEffect
         for (index in 0 until childCount) {
             getChildAt(index).setRenderEffect(appliedEffect)
         }
     }
 
     override fun dispatchDraw(canvas: Canvas) {
-        super.dispatchDraw(canvas)
-
-        if (Color.alpha(tintPaint.color) > 0) {
-            canvas.drawRoundRect(drawRect, cornerRadius, cornerRadius, tintPaint)
+        if (backdropMode) {
+            drawBackdrop(canvas)
+            drawTint(canvas)
+            super.dispatchDraw(canvas)
+        } else {
+            super.dispatchDraw(canvas)
+            drawTint(canvas)
         }
 
         if (intensity > 0f) {
             canvas.drawRoundRect(rimRect, cornerRadius, cornerRadius, rimPaint)
+        }
+    }
+
+    private fun drawTint(canvas: Canvas) {
+        if (Color.alpha(tintPaint.color) > 0) {
+            canvas.drawRoundRect(drawRect, cornerRadius, cornerRadius, tintPaint)
+        }
+    }
+
+    private fun drawBackdrop(canvas: Canvas) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return
+        val effect = blurEffect ?: return
+        if (!canvas.isHardwareAccelerated || width <= 0 || height <= 0) return
+        val node = backdropNode ?: RenderNode("blurBackdrop").also { backdropNode = it }
+        node.setPosition(0, 0, width, height)
+        val recording = node.beginRecording(width, height)
+        try {
+            captureBackdrop(recording)
+        } finally {
+            node.endRecording()
+        }
+        node.setRenderEffect(effect)
+        canvas.drawRenderNode(node)
+    }
+
+    private fun captureBackdrop(canvas: Canvas) {
+        var child: View = this
+        var parent = child.parent as? ViewGroup
+        var offsetX = 0f
+        var offsetY = 0f
+        val levels = ArrayList<Triple<ViewGroup, Int, FloatArray>>()
+        while (parent != null) {
+            offsetX += child.left + child.translationX - parent.scrollX
+            offsetY += child.top + child.translationY - parent.scrollY
+            levels.add(Triple(parent, parent.indexOfChild(child), floatArrayOf(offsetX, offsetY)))
+            child = parent
+            parent = child.parent as? ViewGroup
+        }
+
+        for (level in levels.indices.reversed()) {
+            val (group, branchIndex, offset) = levels[level]
+            group.background?.let { background ->
+                val saved = canvas.save()
+                canvas.translate(-offset[0], -offset[1])
+                background.setBounds(0, 0, group.width, group.height)
+                background.draw(canvas)
+                canvas.restoreToCount(saved)
+            }
+            for (index in 0 until branchIndex) {
+                val sibling = group.getChildAt(index) ?: continue
+                if (sibling.visibility != View.VISIBLE || sibling is SurfaceView) continue
+                val saved = canvas.save()
+                canvas.translate(sibling.left - offset[0], sibling.top - offset[1])
+                if (!sibling.matrix.isIdentity) canvas.concat(sibling.matrix)
+                canvas.translate(-sibling.scrollX.toFloat(), -sibling.scrollY.toFloat())
+                sibling.draw(canvas)
+                canvas.restoreToCount(saved)
+            }
         }
     }
 

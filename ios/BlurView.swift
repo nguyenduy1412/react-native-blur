@@ -96,9 +96,11 @@ public class BlurView: ExpoView {
 
     blurEffectView.frame = b
     tintOverlayView.frame = b
+    layer.cornerRadius = effectiveRadius
+    blurEffectView.layer.cornerRadius = effectiveRadius
 
     if let sdfLayer = sdfHighlightLayer {
-      GlassSDF.update(sdfLayer, bounds: b, cornerRadius: CGFloat(cornerRadius), intensity: intensity)
+      GlassSDF.update(sdfLayer, bounds: b, cornerRadius: effectiveRadius, intensity: intensity)
       return
     }
 
@@ -106,10 +108,13 @@ public class BlurView: ExpoView {
     updateBorderPath()
   }
 
+  private var effectiveRadius: CGFloat {
+    min(CGFloat(cornerRadius), min(bounds.width, bounds.height) / 2)
+  }
+
   private func updateBorderPath() {
     let insetBounds = bounds.insetBy(dx: 0.25, dy: 0.25)
-    let radius = CGFloat(max(0.0, cornerRadius))
-    let path = UIBezierPath(roundedRect: insetBounds, cornerRadius: radius)
+    let path = UIBezierPath(roundedRect: insetBounds, cornerRadius: effectiveRadius)
     borderShapeMask.path = path.cgPath
     borderShapeMask.frame = bounds
   }
@@ -131,9 +136,7 @@ public class BlurView: ExpoView {
 
   public func setBorderRadius(_ radius: Double) {
     self.cornerRadius = max(0.0, radius)
-    layer.cornerRadius = CGFloat(self.cornerRadius)
     layer.cornerCurve = .continuous
-    blurEffectView.layer.cornerRadius = CGFloat(self.cornerRadius)
     blurEffectView.layer.cornerCurve = .continuous
     updateBorderPath()
     setNeedsLayout()
