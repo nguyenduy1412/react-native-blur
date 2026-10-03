@@ -11,8 +11,6 @@ Real iOS system materials on iOS, and the same materials rebuilt on Android with
 [![license](https://img.shields.io/npm/l/@nguyenduy1412/react-native-blur.svg?style=flat-square)](./LICENSE)
 ![platforms](https://img.shields.io/badge/platforms-iOS%20%7C%20Android%20%7C%20Web-blue?style=flat-square)
 
-English · [Tiếng Việt](./README.vi.md)
-
 <img src="https://raw.githubusercontent.com/nguyenduy1412/react-native-blur/main/.github/assets/video-comparison.webp" width="720" alt="Left: this library blurs the playing video. Right: a typical blur library lets the video show through sharp." />
 
 <sub><b>Left:</b> this library. The video behind the glass is blurred like everything else.<br/><b>Right:</b> a typical React Native blur library. Blur is on, but the video stays sharp.</sub>

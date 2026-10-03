@@ -9,7 +9,6 @@
   "files": [
     "build",
     "index.tsx",
-    "README.vi.md",
     "android",
     "ios",
     "expo-module.config.json",
