@@ -1,0 +1,13 @@
+{
+  "$schema": "https://context7.com/schema/context7.json",
+  "projectTitle": "React Native Blur",
+  "description": "Native blur view for React Native and Expo that also blurs SurfaceView video on Android, with iOS system materials and Android RenderEffect materials matched to iOS.",
+  "excludeFolders": ["scripts", ".github", "android", "ios", "build"],
+  "rules": [
+    "Import the default export: import BlurView from \"@nguyenduy1412/react-native-blur\".",
+    "BlurView blurs its children. Wrap the content you want blurred; an empty BlurView over other views shows only the tint on Android.",
+    "Use intensity 0 to disable the blur instead of unmounting the BlurView.",
+    "The package contains native code and does not run in Expo Go; use a development build or EAS Build.",
+    "blurRadius and saturation only affect Android and Web."
+  ]
+}

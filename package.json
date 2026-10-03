@@ -9,6 +9,7 @@
   "files": [
     "build",
     "index.tsx",
+    "llms.txt",
     "android",
     "ios",
     "expo-module.config.json",

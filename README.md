@@ -208,6 +208,68 @@ Accepts every `View` prop, plus:
 - **Colour fidelity:** Android fits each iOS luminance curve with a single colour matrix, so it averages about 2 / 255 off iOS. `systemChromeMaterial` is the outlier, at up to about 23 / 255.
 - **Blur applies to children.** To frost something drawn *behind* an overlay, render that content inside the `BlurView` instead of placing an empty `BlurView` on top.
 
+## FAQ
+
+<details>
+<summary><b>expo-blur or <code>@react-native-community/blur</code> doesn't blur my video on Android. Why?</b></summary>
+
+Android plays video in a `SurfaceView` (`expo-video`, `react-native-video` and most players do). The system composites a `SurfaceView` in its own layer, outside your app's view tree, so a blur that works by capturing the view tree never sees the video, and it stays sharp behind the glass.
+
+This library finds `SurfaceView`s inside the `BlurView`, copies their frames with `PixelCopy` and blurs the copy, so the video is blurred like everything else. Wrap the video in `BlurView`:
+
+```tsx
+<BlurView style={{ flex: 1 }} intensity={60}>
+  <VideoView player={player} style={{ flex: 1 }} />
+</BlurView>
+```
+
+</details>
+
+<details>
+<summary><b>Blur looks grey and flat on Android compared with iOS. How do I make it match?</b></summary>
+
+A single Gaussian blur plus a flat tint washes out the colours. This library rebuilds each iOS material on Android with a `RenderEffect` blur followed by a colour matrix that restores the brightness and saturation the blur removes. The numbers come from Apple's own material recipes, and the result lands within about 2 / 255 of iOS on average. Use the same `tint` on both platforms, for example `tint="systemMaterial"`.
+
+</details>
+
+<details>
+<summary><b>My <code>BlurView</code> shows only a tint on Android, with no blur.</b></summary>
+
+Check two things:
+
+1. **The content must be inside the `BlurView`.** On Android the blur is applied to the view's children. An empty `<BlurView />` placed on top of other views has nothing to blur.
+2. **The device must run Android 12 (API 31) or later.** `RenderEffect` does not exist on older versions, so they get the tint and rim only.
+
+</details>
+
+<details>
+<summary><b>How do I blur the screen behind a modal or overlay?</b></summary>
+
+Render the screen inside a `BlurView` and drive `intensity` from your modal state. `0` turns the effect off completely.
+
+```tsx
+<BlurView style={{ flex: 1 }} intensity={modalVisible ? 60 : 0}>
+  <Screen />
+</BlurView>
+<MyModal visible={modalVisible} />
+```
+
+</details>
+
+<details>
+<summary><b>Does it work in Expo Go?</b></summary>
+
+No. It contains native code, so you need a development build (`npx expo run:ios` / `npx expo run:android`) or EAS Build. It works with Expo prebuild, and with bare React Native once Expo Modules is installed.
+
+</details>
+
+<details>
+<summary><b>Does it support the New Architecture?</b></summary>
+
+Yes. It is built on the Expo Modules API and is tested with React Native 0.86 and Expo SDK 57.
+
+</details>
+
 ## Contributing
 
 Issues and pull requests are welcome at [github.com/nguyenduy1412/react-native-blur](https://github.com/nguyenduy1412/react-native-blur/issues). When reporting a visual issue, include the platform, OS version, the `tint` and `intensity` you used, and a screenshot.
