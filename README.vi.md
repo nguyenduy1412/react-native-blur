@@ -8,7 +8,7 @@ iOS dùng đúng chất liệu blur của hệ thống. Android dựng lại cù
 
 [English](./README.md) · Tiếng Việt
 
-<img src="https://raw.githubusercontent.com/nguyenduy1412/react-native-blur/main/.github/assets/video-comparison.webp" width="600" alt="Trái: thư viện này làm mờ cả video đang phát. Phải: thư viện blur thông thường để video xuyên qua, vẫn sắc nét." />
+<img src="https://raw.githubusercontent.com/nguyenduy1412/react-native-blur/main/.github/assets/video-comparison.webp" width="720" alt="Trái: thư viện này làm mờ cả video đang phát. Phải: thư viện blur thông thường để video xuyên qua, vẫn sắc nét." />
 
 <sub><b>Trái:</b> thư viện này, video phía sau lớp kính bị làm mờ như mọi thứ khác.<br/><b>Phải:</b> một thư viện blur React Native thông thường, bật blur nhưng video vẫn sắc nét.</sub>
 
