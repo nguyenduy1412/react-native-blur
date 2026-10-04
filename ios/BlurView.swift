@@ -1,4 +1,3 @@
-import ExpoModulesCore
 import UIKit
 import QuartzCore
 
@@ -41,7 +40,8 @@ final class BlurEffectView: UIVisualEffectView {
   }
 }
 
-public class BlurView: ExpoView {
+@objc(NguyenduyBlurNativeView)
+public class BlurView: UIView {
   private let blurEffectView = BlurEffectView()
   private let tintOverlayView = UIView()
   private let specularBorderLayer = CAGradientLayer()
@@ -53,8 +53,13 @@ public class BlurView: ExpoView {
   private var customTintColorString: String?
   private var cornerRadius: Double = 0.0
 
-  public required init(appContext: AppContext? = nil) {
-    super.init(appContext: appContext)
+  @objc public override init(frame: CGRect) {
+    super.init(frame: frame)
+    setupViews()
+  }
+
+  public required init?(coder: NSCoder) {
+    super.init(coder: coder)
     setupViews()
   }
 
@@ -119,22 +124,22 @@ public class BlurView: ExpoView {
     borderShapeMask.frame = bounds
   }
 
-  public func setIntensity(_ intensity: Double) {
+  @objc public func setIntensity(_ intensity: Double) {
     self.intensity = max(0.0, min(100.0, intensity))
     applyBlur()
   }
 
-  public func setTint(_ tint: String) {
+  @objc public func setTint(_ tint: String) {
     self.tintStyleString = tint
     applyBlur()
   }
 
-  public func setTintColor(_ colorStr: String?) {
+  @objc(setBlurTintColor:) public func setTintColor(_ colorStr: String?) {
     self.customTintColorString = colorStr
     updateTintOverlay()
   }
 
-  public func setBorderRadius(_ radius: Double) {
+  @objc public func setCornerRadius(_ radius: Double) {
     self.cornerRadius = max(0.0, radius)
     layer.cornerCurve = .continuous
     blurEffectView.layer.cornerCurve = .continuous

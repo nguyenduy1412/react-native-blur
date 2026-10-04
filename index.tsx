@@ -1,5 +1,4 @@
 import React from 'react';
-import { requireNativeModule, requireNativeView } from 'expo';
 import {
   Platform,
   View,
@@ -8,6 +7,7 @@ import {
   StyleSheet,
   StyleProp,
 } from 'react-native';
+import NativeBlurView from './src/NguyenduyBlurViewNativeComponent';
 
 export type BlurTint =
   | 'light'
@@ -35,23 +35,6 @@ export interface BlurViewProps extends ViewProps {
   style?: StyleProp<ViewStyle>;
 }
 
-export type CrystalBlurViewProps = BlurViewProps;
-
-interface NativeBlurViewProps extends ViewProps {
-  mode?: BlurMode;
-  intensity?: number;
-  blurRadius?: number;
-  saturation?: number;
-  tint?: string;
-  tintColor?: string;
-  borderRadius?: number;
-}
-
-const NativeBlurView =
-  Platform.OS === 'ios' || Platform.OS === 'android'
-    ? requireNativeView<NativeBlurViewProps>('BlurView')
-    : null;
-
 export const BlurView: React.FC<BlurViewProps> = ({
   mode = 'content',
   intensity = 50,
@@ -78,7 +61,7 @@ export const BlurView: React.FC<BlurViewProps> = ({
       saturation,
       tint,
       tintColor,
-      borderRadius: computedBorderRadius,
+      cornerRadius: computedBorderRadius,
     };
     const containerStyle = [
       styles.container,
@@ -143,13 +126,6 @@ export const BlurView: React.FC<BlurViewProps> = ({
     </View>
   );
 };
-
-export const CrystalBlurView = BlurView;
-
-export function dumpGlassInternals(): Record<string, unknown> {
-  if (Platform.OS !== 'ios') return {};
-  return requireNativeModule('BlurView').dumpGlassInternals();
-}
 
 const styles = StyleSheet.create({
   container: {

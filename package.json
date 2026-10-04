@@ -1,18 +1,20 @@
 {
   "name": "@nguyenduy1412/react-native-blur",
   "version": "1.1.2",
-  "description": "React Native blur view for Expo and bare React Native: backdrop blur and frosted glass for headers, tab bars, cards and popups, plus content and video blur. Native iOS materials and Android RenderEffect matched to iOS.",
+  "description": "React Native blur view for React Native CLI and Expo: backdrop blur and frosted glass for headers, tab bars, cards and popups, plus content and video blur. Native iOS materials and Android RenderEffect matched to iOS.",
   "main": "build/index.js",
   "types": "build/index.d.ts",
   "react-native": "index.tsx",
   "source": "index.tsx",
   "files": [
     "build",
+    "src",
     "index.tsx",
+    "README.md",
     "llms.txt",
     "android",
     "ios",
-    "expo-module.config.json",
+    "NguyenduyBlur.podspec",
     "!android/build",
     "!android/.gradle",
     "!ios/build"
@@ -30,7 +32,6 @@
     "react-native-blur-view",
     "expo",
     "expo-blur",
-    "expo-module",
     "backdrop-blur",
     "frosted-glass",
     "glassmorphism",
@@ -47,7 +48,10 @@
     "frosted-glass-effect",
     "glass-effect",
     "sticky-header",
-    "tab-bar"
+    "tab-bar",
+    "react-native-cli",
+    "fabric",
+    "new-architecture"
   ],
   "repository": {
     "type": "git",
@@ -66,15 +70,26 @@
     "access": "public"
   },
   "peerDependencies": {
-    "expo": "*",
     "react": "*",
-    "react-native": "*"
+    "react-native": ">=0.76"
   },
   "devDependencies": {
     "@types/react": "~19.2.0",
-    "expo": "~57.0.23",
     "react": "^19.2.3",
     "react-native": "^0.86.3",
     "typescript": "^6.0.3"
+  },
+  "codegenConfig": {
+    "name": "NguyenduyBlurViewSpec",
+    "type": "components",
+    "jsSrcsDir": "src",
+    "android": {
+      "javaPackageName": "com.nguyenduy.blur"
+    },
+    "ios": {
+      "componentProvider": {
+        "NguyenduyBlurView": "NguyenduyBlurViewComponentView"
+      }
+    }
   }
 }

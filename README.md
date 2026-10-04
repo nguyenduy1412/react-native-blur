@@ -29,19 +29,33 @@ Blur what is behind headers, tab bars, cards, popups and buttons while their con
 - 🌗 **Light and dark aware.** Material tints follow the system appearance on Android.
 - 🎚️ **One `intensity` prop** from 0 to 100 drives blur, colour and rim together.
 - 🌐 **Web fallback** with CSS `backdrop-filter`.
-- 📦 **Small**, no JS dependencies, built on the Expo Modules API.
+- 📦 **Works everywhere**: a native Fabric component for React Native CLI and Expo apps alike, with no JS dependencies and no Expo requirement.
 
 ## Installation
 
-```sh
-npx expo install @nguyenduy1412/react-native-blur
-```
-
-<details>
-<summary>npm, yarn, pnpm or bun</summary>
+### React Native CLI
 
 ```sh
 npm install @nguyenduy1412/react-native-blur
+cd ios && pod install
+```
+
+Then rebuild the app (`npx react-native run-ios` / `npx react-native run-android`). Autolinking picks the library up; no Expo packages are needed.
+
+### Expo
+
+```sh
+npx expo install @nguyenduy1412/react-native-blur
+npx expo run:ios
+npx expo run:android
+```
+
+It contains native code, so it **does not run in Expo Go**; use a development build or EAS Build.
+
+<details>
+<summary>yarn, pnpm or bun</summary>
+
+```sh
 yarn add @nguyenduy1412/react-native-blur
 pnpm add @nguyenduy1412/react-native-blur
 bun add @nguyenduy1412/react-native-blur
@@ -49,22 +63,14 @@ bun add @nguyenduy1412/react-native-blur
 
 </details>
 
-This package contains native code, so it **does not run in Expo Go**. Rebuild your development build:
-
-```sh
-npx expo run:ios
-npx expo run:android
-```
-
-**Bare React Native:** install Expo Modules first with `npx install-expo-modules@latest`, then `cd ios && pod install`.
-
 ### Requirements
 
 | | Minimum |
 | --- | --- |
+| React Native | 0.76 with the New Architecture (Fabric). Tested with React Native 0.86. |
 | iOS | 15.1 |
 | Android | API 31 (Android 12) for the blur. Older versions render the tint and rim without blur. |
-| Expo | Built and tested with Expo SDK 57 and React Native 0.86 |
+| Expo (optional) | Tested with Expo SDK 57 |
 
 ## Quick start
 
@@ -334,18 +340,36 @@ On Android, React Native's `<Modal>` opens a separate window, and backdrop mode 
 </details>
 
 <details>
+<summary><b>Does it work without Expo, in a React Native CLI app?</b></summary>
+
+Yes. Since 2.0 it is a regular React Native library (a Fabric component), so `npm install` plus `pod install` is all a React Native CLI app needs. No Expo packages are installed.
+
+</details>
+
+<details>
 <summary><b>Does it work in Expo Go?</b></summary>
 
-No. It contains native code, so you need a development build (`npx expo run:ios` / `npx expo run:android`) or EAS Build. It works with Expo prebuild, and with bare React Native once Expo Modules is installed.
+No. It contains native code, so you need a development build (`npx expo run:ios` / `npx expo run:android`) or EAS Build. Plain React Native CLI apps work out of the box.
 
 </details>
 
 <details>
 <summary><b>Does it support the New Architecture?</b></summary>
 
-Yes. It is built on the Expo Modules API and is tested with React Native 0.86 and Expo SDK 57.
+Yes, and it requires it. It is a Fabric native component generated with React Native Codegen, tested with React Native 0.86 in both a plain React Native CLI app and an Expo SDK 57 app.
 
 </details>
+
+## Migrating from 1.x
+
+2.0 turns the library from an Expo Module into a plain React Native Fabric component, so it now also works in React Native CLI apps without Expo.
+
+- **Rebuild the native app** after upgrading (`pod install`, then rebuild iOS and Android). The iOS pod is now called `NguyenduyBlur`.
+- **New Architecture is required** (React Native 0.76+, the default since 0.76).
+- **Removed:** the `CrystalBlurView` alias (use `BlurView`) and the iOS debug helper `dumpGlassInternals`.
+- **Fixed:** `borderRadius` on Android is now in dp, matching iOS. In 1.x it was applied in pixels, so corners were smaller on Android.
+
+The `BlurView` props are unchanged.
 
 ## Contributing
 

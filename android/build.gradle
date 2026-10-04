@@ -1,28 +1,46 @@
-apply plugin: 'com.android.library'
-apply plugin: 'kotlin-android'
-
-group = 'expo.modules.blurview'
-version = '1.0.0'
+apply plugin: "com.android.library"
+apply plugin: "kotlin-android"
+apply plugin: "com.facebook.react"
 
 def safeExtGet(prop, fallback) {
     rootProject.ext.has(prop) ? rootProject.ext.get(prop) : fallback
 }
 
 android {
-    namespace "expo.modules.blurview"
+    namespace "com.nguyenduy.blur"
     compileSdkVersion safeExtGet("compileSdkVersion", 35)
+
     defaultConfig {
         minSdkVersion safeExtGet("minSdkVersion", 24)
         targetSdkVersion safeExtGet("targetSdkVersion", 35)
-        versionCode 1
-        versionName "1.0.0"
     }
+
+    buildFeatures {
+        buildConfig true
+    }
+
     lintOptions {
         abortOnError false
     }
+
+    sourceSets {
+        main {
+            java.srcDirs += ["${project.buildDir}/generated/source/codegen/java"]
+        }
+    }
+}
+
+react {
+    jsRootDir = file("../src/")
+    libraryName = "NguyenduyBlurView"
+    codegenJavaPackageName = "com.nguyenduy.blur"
+}
+
+repositories {
+    google()
+    mavenCentral()
 }
 
 dependencies {
-    implementation project(':expo-modules-core')
-    implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:${safeExtGet('kotlinVersion', '1.9.24')}"
+    implementation "com.facebook.react:react-android"
 }

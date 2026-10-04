@@ -1,4 +1,4 @@
-package expo.modules.blurview
+package com.nguyenduy.blur
 
 import android.content.Context
 import android.content.res.Configuration
@@ -25,8 +25,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.ViewOutlineProvider
 import android.view.ViewTreeObserver
-import expo.modules.kotlin.AppContext
-import expo.modules.kotlin.views.ExpoView
+import com.facebook.react.views.view.ReactViewGroup
 
 private class Material(
     val blurRadius: Float,
@@ -87,7 +86,7 @@ private fun luminancePlateLine(values: FloatArray): Pair<Float, Float> {
     return slope to mean - slope * 0.5f
 }
 
-class BlurView(context: Context, appContext: AppContext) : ExpoView(context, appContext) {
+class BlurView(context: Context) : ReactViewGroup(context) {
 
     private val density = context.resources.displayMetrics.density
 
@@ -136,8 +135,11 @@ class BlurView(context: Context, appContext: AppContext) : ExpoView(context, app
     private val drawRect = RectF()
     private val rimRect = RectF()
 
+    val blurContent = BlurContentView(context) { applyEffects() }
+
     init {
         setWillNotDraw(false)
+        addView(blurContent, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
         updateOutline()
         updateShaders()
         applyEffects()
@@ -178,16 +180,16 @@ class BlurView(context: Context, appContext: AppContext) : ExpoView(context, app
         invalidate()
     }
 
-    fun setBorderRadius(radius: Double) {
-        this.cornerRadius = radius.toFloat().coerceAtLeast(0f)
+    fun setCornerRadius(radius: Double) {
+        this.cornerRadius = radius.toFloat().coerceAtLeast(0f) * density
         updateOutline()
         updateShaders()
         invalidate()
     }
 
-    override fun onViewAdded(child: View) {
-        super.onViewAdded(child)
-        applyEffects()
+    override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
+        super.onLayout(changed, left, top, right, bottom)
+        blurContent.layout(0, 0, right - left, bottom - top)
     }
 
     override fun onDescendantInvalidated(child: View, target: View) {
@@ -417,9 +419,7 @@ class BlurView(context: Context, appContext: AppContext) : ExpoView(context, app
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return
         val waitingForMirror = appliedEffect == null && surfaceMirrors.values.any { !it.ready }
         appliedEffect = if (backdropMode || waitingForMirror) null else blurEffect
-        for (index in 0 until childCount) {
-            getChildAt(index).setRenderEffect(appliedEffect)
-        }
+        blurContent.setRenderEffect(appliedEffect)
     }
 
     override fun dispatchDraw(canvas: Canvas) {
@@ -506,5 +506,14 @@ class BlurView(context: Context, appContext: AppContext) : ExpoView(context, app
             return Color.argb(a, r, g, b)
         }
         return Color.parseColor(trimmed)
+    }
+}
+
+class BlurContentView(context: Context, private val onChildAdded: () -> Unit) : ViewGroup(context) {
+    override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) = Unit
+
+    override fun onViewAdded(child: View) {
+        super.onViewAdded(child)
+        onChildAdded()
     }
 }

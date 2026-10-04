@@ -11,5 +11,8 @@
     "skipLibCheck": true,
     "esModuleInterop": true
   },
-  "include": ["index.tsx"]
+  "include": [
+    "index.tsx",
+    "src"
+  ]
 }
