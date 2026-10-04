@@ -48,8 +48,8 @@ public class BlurView: UIView {
   private let borderShapeMask = CAShapeLayer()
   private var sdfHighlightLayer: CALayer?
 
-  private var intensity: Double = 100.0
-  private var tintStyleString: String = "glass"
+  private var intensity: Double = 50.0
+  private var tintStyleString: String = "default"
   private var customTintColorString: String?
   private var cornerRadius: Double = 0.0
 

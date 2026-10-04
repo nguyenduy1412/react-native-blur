@@ -90,7 +90,7 @@ class BlurView(context: Context) : ReactViewGroup(context) {
 
     private val density = context.resources.displayMetrics.density
 
-    private var intensity: Float = 100f
+    private var intensity: Float = 50f
     private var customBlurRadius: Float? = null
     private var saturationBoost: Float = 1f
     private var tint: String = "default"
