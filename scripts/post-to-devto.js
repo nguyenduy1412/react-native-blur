@@ -11,10 +11,10 @@ const fs = require('fs');
 const path = require('path');
 const https = require('https');
 
-const apiKey = process.env.DEVTO_API_KEY || process.argv[2];
+const apiKey = process.env.DEVTO_API_KEY;
 
 if (!apiKey) {
-  console.error('\x1b[31mError: Dev.to API key missing!\x1b[0m');
+  console.error('\x1b[31mError: Dev.to API key missing! Set the DEVTO_API_KEY environment variable.\x1b[0m');
   process.exit(1);
 }
 
