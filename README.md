@@ -216,6 +216,16 @@ Most blur libraries for React Native look fine over a static screen and break do
 
 The same screen, four ways. Android and iOS from this library land on the same brightness, saturation and depth. The flat-tint approach (right) turns the same content into a grey wash.
 
+### Comparison Matrix
+
+| Feature | `@nguyenduy1412/react-native-blur` | `expo-blur` | `@react-native-community/blur` |
+| :--- | :---: | :---: | :---: |
+| **New Architecture (Fabric)** | ✅ Native Fabric Component | ⚠️ Expo Module | ❌ Deprecated / Legacy Bridge |
+| **Blurs Playing Video (Android SurfaceView)** | ✅ Yes (`PixelCopy` + `RenderEffect`) | ❌ Video stays sharp | ❌ Video stays sharp |
+| **Backdrop Overlays (Headers, Tab Bars, Popups)** | ✅ Yes (`mode="backdrop"`) | ⚠️ Limited / Tint only | ⚠️ Platform discrepancies |
+| **iOS Material Match on Android** | ✅ Color-calibrated (1.95/255 error) | ❌ Flat grey tint | ❌ Flat grey tint |
+| **Works with RN CLI & Expo Dev Client** | ✅ No Expo packages required | ⚠️ Primarily Expo | ⚠️ Complex autolinking |
+
 📖 **Deep dive with video:** [Kaizer Blur: real blur, even over video](https://kaizer-app.vercel.app) (see the *Library* section).
 
 ## API

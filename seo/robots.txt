@@ -1,0 +1,22 @@
+# Deploy this file at https://kaizer-app.vercel.app/robots.txt
+# It intentionally permits search and AI-search crawlers to discover the public library documentation.
+
+User-agent: Googlebot
+Allow: /
+
+User-agent: Bingbot
+Allow: /
+
+User-agent: OAI-SearchBot
+Allow: /
+
+User-agent: Claude-SearchBot
+Allow: /
+
+User-agent: Claude-User
+Allow: /
+
+User-agent: *
+Allow: /
+
+Sitemap: https://kaizer-app.vercel.app/sitemap.xml
