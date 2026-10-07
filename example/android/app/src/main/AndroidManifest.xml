@@ -29,5 +29,10 @@
             <data android:scheme="blurexample" />
         </intent-filter>
       </activity>
+      <activity
+        android:name=".VideoTestActivity"
+        android:label="Blur Video Test"
+        android:exported="true"
+        android:configChanges="keyboard|keyboardHidden|orientation|screenLayout|screenSize|smallestScreenSize|uiMode" />
     </application>
 </manifest>

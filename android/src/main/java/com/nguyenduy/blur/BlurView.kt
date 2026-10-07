@@ -157,7 +157,10 @@ class BlurView(context: Context) : ReactViewGroup(context) {
 
     private val fallbackPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
 
-    val blurContent = BlurContentView(context) { applyEffects() }
+    val blurContent = BlurContentView(context) {
+        syncSurfaceMirrors()
+        applyEffects()
+    }
 
     init {
         setWillNotDraw(false)
@@ -242,6 +245,22 @@ class BlurView(context: Context) : ReactViewGroup(context) {
     private val hasUniformCorners get() = cornerRadii.all { it == cornerRadii[0] }
 
     private val hasCorners get() = cornerRadii.any { it > 0f }
+
+    override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+        val widthMode = MeasureSpec.getMode(widthMeasureSpec)
+        val heightMode = MeasureSpec.getMode(heightMeasureSpec)
+        if (widthMode == MeasureSpec.EXACTLY && heightMode == MeasureSpec.EXACTLY) {
+            super.onMeasure(widthMeasureSpec, heightMeasureSpec)
+        } else {
+            val width = MeasureSpec.getSize(widthMeasureSpec)
+            val height = MeasureSpec.getSize(heightMeasureSpec)
+            setMeasuredDimension(width, height)
+        }
+        blurContent.measure(
+            MeasureSpec.makeMeasureSpec(measuredWidth, MeasureSpec.EXACTLY),
+            MeasureSpec.makeMeasureSpec(measuredHeight, MeasureSpec.EXACTLY)
+        )
+    }
 
     override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
         super.onLayout(changed, left, top, right, bottom)
@@ -379,6 +398,7 @@ class BlurView(context: Context) : ReactViewGroup(context) {
         )
         mirror.copying = true
         PixelCopy.request(view, frame.bitmap, { result ->
+            android.util.Log.d("BlurView", "PixelCopy result: $result (SUCCESS=${PixelCopy.SUCCESS})")
             mirror.copying = false
             mirror.ready = true
             if (result == PixelCopy.SUCCESS && surfaceMirrors[view] === mirror) showMirror(mirror, frame)
@@ -410,19 +430,13 @@ class BlurView(context: Context) : ReactViewGroup(context) {
             shown.alpha = 0
             return
         }
-        val view = mirror.view
-        if (mirror.ownerAlpha.isNaN() || view.alpha != 0f) {
-            mirror.ownerAlpha = view.alpha
-            view.alpha = 0f
-        }
-        shown.alpha = (mirror.ownerAlpha * 255).toInt()
+        shown.alpha = 255
     }
 
     private fun releaseMirror(view: SurfaceView) {
         val mirror = surfaceMirrors.remove(view) ?: return
         mirror.shown?.let { view.overlay.remove(it) }
         mirror.shown = null
-        if (!mirror.ownerAlpha.isNaN()) view.alpha = mirror.ownerAlpha
     }
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
@@ -672,7 +686,28 @@ class BlurView(context: Context) : ReactViewGroup(context) {
 }
 
 class BlurContentView(context: Context, private val onChildAdded: () -> Unit) : ViewGroup(context) {
-    override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) = Unit
+    override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+        val width = MeasureSpec.getSize(widthMeasureSpec)
+        val height = MeasureSpec.getSize(heightMeasureSpec)
+        setMeasuredDimension(width, height)
+        for (i in 0 until childCount) {
+            getChildAt(i).measure(
+                MeasureSpec.makeMeasureSpec(width, MeasureSpec.EXACTLY),
+                MeasureSpec.makeMeasureSpec(height, MeasureSpec.EXACTLY)
+            )
+        }
+    }
+
+    override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
+        val w = right - left
+        val h = bottom - top
+        for (i in 0 until childCount) {
+            val child = getChildAt(i)
+            if (child.width == 0 && child.height == 0) {
+                child.layout(0, 0, w, h)
+            }
+        }
+    }
 
     override fun onViewAdded(child: View) {
         super.onViewAdded(child)
