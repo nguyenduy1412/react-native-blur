@@ -66,7 +66,6 @@ public class BlurView: UIView {
   private let tintOverlayView = UIView()
   private let specularBorderLayer = CAGradientLayer()
   private let borderShapeMask = CAShapeLayer()
-  private var sdfHighlightLayer: CALayer?
 
   private var intensity: Double = 50.0
   private var tintStyleString: String = "default"
@@ -106,11 +105,6 @@ public class BlurView: UIView {
     specularBorderLayer.mask = borderShapeMask
     layer.addSublayer(specularBorderLayer)
 
-    if let sdfLayer = GlassSDF.makeHighlightLayer() {
-      layer.addSublayer(sdfLayer)
-      sdfHighlightLayer = sdfLayer
-    }
-
     layer.cornerCurve = .continuous
     blurEffectView.layer.cornerCurve = .continuous
 
@@ -139,22 +133,17 @@ public class BlurView: UIView {
     layer.cornerRadius = uniformRadius
     blurEffectView.layer.cornerRadius = uniformRadius
 
-    let useSDF = sdfHighlightLayer != nil && hasUniformCorners
     let rimVisible = intensity > 0
-    sdfHighlightLayer?.isHidden = !useSDF || !rimVisible
-    specularBorderLayer.isHidden = useSDF || !rimVisible
-    if let sdfLayer = sdfHighlightLayer, useSDF {
-      GlassSDF.update(sdfLayer, bounds: b, cornerRadius: uniformRadius, intensity: intensity)
-      return
+    specularBorderLayer.isHidden = !rimVisible
+    if rimVisible {
+      CATransaction.begin()
+      CATransaction.setDisableActions(true)
+      specularBorderLayer.frame = b
+      specularBorderLayer.opacity = Float(max(0.0, min(1.0, intensity / 100.0)))
+      borderShapeMask.frame = b
+      borderShapeMask.path = borderPath(in: b.insetBy(dx: 0.25, dy: 0.25)).cgPath
+      CATransaction.commit()
     }
-
-    CATransaction.begin()
-    CATransaction.setDisableActions(true)
-    specularBorderLayer.frame = b
-    specularBorderLayer.opacity = Float(max(0.0, min(1.0, intensity / 100.0)))
-    borderShapeMask.frame = b
-    borderShapeMask.path = borderPath(in: b.insetBy(dx: 0.25, dy: 0.25)).cgPath
-    CATransaction.commit()
   }
 
   private func borderPath(in rect: CGRect) -> UIBezierPath {

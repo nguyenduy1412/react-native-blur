@@ -30,7 +30,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-KOTLIN = Path(__file__).resolve().parents[1] / "android/src/main/java/expo/modules/blurview/BlurView.kt"
+KOTLIN = Path(__file__).resolve().parents[1] / "android/src/main/java/com/nguyenduy/blur/BlurView.kt"
 
 RECIPE_FILES = {
     ("LIGHT", "ultrathin"): "platformContentUltraThinLight",
