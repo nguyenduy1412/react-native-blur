@@ -67,7 +67,7 @@ private const val SURFACE_MIRROR_DOWNSCALE = 4
 private const val SURFACE_MIRROR_INTERVAL_NANOS = 33_000_000L
 private const val WINDOW_MIRROR_DOWNSCALE = 2
 
-private class SurfaceMirror(val view: SurfaceView) {
+private class SurfaceMirror(val view: SurfaceView, val useOverlay: Boolean = true) {
     val frames = arrayOfNulls<BitmapDrawable>(2)
     var next = 0
     var shown: BitmapDrawable? = null
@@ -294,9 +294,11 @@ class BlurView(context: Context) : ReactViewGroup(context) {
     // ponytail: rescans the whole subtree on every global layout to find SurfaceViews (O(n) per layout);
     // upgrade path is an OnHierarchyChangeListener chain if the blurred tree gets large.
     private fun syncSurfaceMirrors() {
-        val found = if (blurEffect != null && !backdropMode && isAttachedToWindow) collectSurfaceViews(this, mutableListOf()) else emptyList()
+        val found: List<SurfaceView> = if (blurEffect != null && isAttachedToWindow) {
+            if (backdropMode) collectBackdropSiblingViews() else collectSurfaceViews(this, mutableListOf())
+        } else emptyList()
         (surfaceMirrors.keys - found.toSet()).forEach(::releaseMirror)
-        found.forEach { surfaceMirrors.getOrPut(it) { SurfaceMirror(it) } }
+        found.forEach { sv -> surfaceMirrors.getOrPut(sv) { SurfaceMirror(sv, useOverlay = !backdropMode) } }
         updateMirrorLoop()
     }
 
@@ -371,6 +373,35 @@ class BlurView(context: Context) : ReactViewGroup(context) {
         return out
     }
 
+    /** Walk up the tree and collect SurfaceViews that are siblings drawn before us (backdrop mode). */
+    private fun collectBackdropSiblingViews(): List<SurfaceView> {
+        val out = mutableListOf<SurfaceView>()
+        var child: View = this
+        var parent = child.parent as? ViewGroup
+        while (parent != null) {
+            val branchIndex = parent.indexOfChild(child)
+            for (index in 0 until branchIndex) {
+                val sibling = parent.getChildAt(index) ?: continue
+                if (sibling.visibility != View.VISIBLE) continue
+                if (sibling is SurfaceView) out.add(sibling)
+                else if (sibling is ViewGroup) collectSurfaceViews(sibling, out)
+            }
+            child = parent
+            parent = child.parent as? ViewGroup
+        }
+        return out
+    }
+
+    private fun hasSurfaceViewDescendant(view: ViewGroup): Boolean {
+        for (i in 0 until view.childCount) {
+            when (val child = view.getChildAt(i)) {
+                is SurfaceView -> return true
+                is ViewGroup -> if (hasSurfaceViewDescendant(child)) return true
+            }
+        }
+        return false
+    }
+
     private fun startMirrorLoop() {
         if (mirrorLoopRunning) return
         mirrorLoopRunning = true
@@ -416,15 +447,18 @@ class BlurView(context: Context) : ReactViewGroup(context) {
     }
 
     private fun showMirror(mirror: SurfaceMirror, frame: BitmapDrawable) {
-        val overlay = mirror.view.overlay
-        mirror.shown?.let { if (it !== frame) overlay.remove(it) }
         frame.setBounds(0, 0, mirror.view.width, mirror.view.height)
-        if (mirror.shown !== frame) overlay.add(frame) else mirror.view.invalidate()
+        if (mirror.useOverlay) {
+            val overlay = mirror.view.overlay
+            mirror.shown?.let { if (it !== frame) overlay.remove(it) }
+            if (mirror.shown !== frame) overlay.add(frame) else mirror.view.invalidate()
+        }
         mirror.shown = frame
         mirror.next = 1 - mirror.next
     }
 
     private fun syncSurfaceAlpha(mirror: SurfaceMirror) {
+        if (!mirror.useOverlay) return  // backdrop siblings are drawn directly in captureBackdrop, not via overlay
         val shown = mirror.shown ?: return
         if (appliedEffect == null) {
             shown.alpha = 0
@@ -435,7 +469,7 @@ class BlurView(context: Context) : ReactViewGroup(context) {
 
     private fun releaseMirror(view: SurfaceView) {
         val mirror = surfaceMirrors.remove(view) ?: return
-        mirror.shown?.let { view.overlay.remove(it) }
+        if (mirror.useOverlay) mirror.shown?.let { view.overlay.remove(it) }
         mirror.shown = null
     }
 
@@ -673,14 +707,46 @@ class BlurView(context: Context) : ReactViewGroup(context) {
             }
             for (index in 0 until branchIndex) {
                 val sibling = group.getChildAt(index) ?: continue
-                if (sibling.visibility != View.VISIBLE || sibling is SurfaceView) continue
+                if (sibling.visibility != View.VISIBLE) continue
                 val saved = canvas.save()
                 canvas.translate(sibling.left - offset[0], sibling.top - offset[1])
                 if (!sibling.matrix.isIdentity) canvas.concat(sibling.matrix)
                 canvas.translate(-sibling.scrollX.toFloat(), -sibling.scrollY.toFloat())
-                sibling.draw(canvas)
+                drawCaptureSubtree(canvas, sibling)
                 canvas.restoreToCount(saved)
             }
+        }
+    }
+
+    /**
+     * Draws [view] onto [canvas] for the backdrop capture pass.
+     * SurfaceViews cannot be drawn via Canvas; instead we substitute the PixelCopy mirror
+     * tracked in [surfaceMirrors]. If a ViewGroup contains SurfaceView descendants we
+     * recurse into it child-by-child so only the SurfaceViews themselves are substituted.
+     */
+    private fun drawCaptureSubtree(canvas: Canvas, view: View) {
+        when {
+            view is SurfaceView -> {
+                // Draw the PixelCopy mirror if one is ready, otherwise leave transparent.
+                surfaceMirrors[view]?.shown?.draw(canvas)
+            }
+            view is ViewGroup && hasSurfaceViewDescendant(view) -> {
+                // Draw background then recurse into children individually.
+                view.background?.let { bg ->
+                    bg.setBounds(0, 0, view.width, view.height)
+                    bg.draw(canvas)
+                }
+                for (i in 0 until view.childCount) {
+                    val child = view.getChildAt(i) ?: continue
+                    if (child.visibility != View.VISIBLE) continue
+                    val saved = canvas.save()
+                    canvas.translate((child.left - view.scrollX).toFloat(), (child.top - view.scrollY).toFloat())
+                    if (!child.matrix.isIdentity) canvas.concat(child.matrix)
+                    drawCaptureSubtree(canvas, child)
+                    canvas.restoreToCount(saved)
+                }
+            }
+            else -> view.draw(canvas)
         }
     }
 }
