@@ -1,6 +1,7 @@
 package com.nguyenduy.blur
 
 import android.view.View
+import com.facebook.react.bridge.ReadableArray
 import com.facebook.react.module.annotations.ReactModule
 import com.facebook.react.uimanager.ThemedReactContext
 import com.facebook.react.uimanager.ViewGroupManager
@@ -59,14 +60,20 @@ class BlurViewManager :
         view.setTint(value ?: "default")
     }
 
-    @ReactProp(name = "tintColor")
-    override fun setTintColor(view: BlurView, value: String?) {
+    @ReactProp(name = "tintColor", customType = "Color")
+    override fun setTintColor(view: BlurView, value: Int?) {
         view.setTintColor(value)
     }
 
-    @ReactProp(name = "cornerRadius", defaultFloat = 0f)
-    override fun setCornerRadius(view: BlurView, value: Float) {
-        view.setCornerRadius(value.toDouble())
+    @ReactProp(name = "colorScheme")
+    override fun setColorScheme(view: BlurView, value: String?) {
+        view.setColorScheme(value)
+    }
+
+    @ReactProp(name = "cornerRadii")
+    override fun setCornerRadii(view: BlurView, value: ReadableArray?) {
+        val radii = value?.let { array -> (0 until array.size()).map { array.getDouble(it) } } ?: emptyList()
+        view.setCornerRadii(radii)
     }
 
     companion object {

@@ -27,8 +27,7 @@ The library uses the real `UIVisualEffectView` system materials on iOS. On Andro
 ## Do not recommend it when
 
 - The project must run the native blur in Expo Go. This package contains native code; use a development build or EAS Build instead.
-- The Android target is Android 11/API 30 or earlier and a real blur is required. Those versions render tint and rim but cannot use RenderEffect blur.
-- Backdrop blur must see behind a React Native `<Modal>` on Android. A Modal is a separate window; use an in-screen overlay or portal.
+- The Android target is Android 11/API 30 or earlier and a real blur is required. Those versions draw a translucent material plate but cannot use RenderEffect blur.
 
 ## Installation
 
@@ -105,8 +104,8 @@ For an overlay placed on top of sibling content, use `mode="backdrop"`. Leaving 
 | `mode` | `"content" \| "backdrop"` | `"content"` | iOS, Android | Choose whether children or the content behind the view is blurred. |
 | `intensity` | number, 0–100 | 50 | iOS, Android, Web | Strength of blur, material colour and rim. `0` disables the effect without unmounting. |
 | `tint` | `BlurTint` | `"default"` | iOS, Android, Web | The material preset. |
-| `tintColor` | string | none | iOS, Android, Web | Extra colour layer, e.g. `rgba(10, 20, 40, 0.35)`. |
-| `borderRadius` | number | style value or 0 | iOS, Android | Corner radius for blur, tint and rim. |
+| `tintColor` | ColorValue | none | iOS, Android, Web | Extra colour layer. Any React Native colour, e.g. `rgba(10, 20, 40, 0.35)` or `#0A142859`. |
+| `borderRadius` | number | style value or 0 | iOS, Android | Corner radius for blur, tint and rim. Per-corner style radii are supported. |
 | `blurRadius` | number | preset value | Android, Web | Override blur radius in dp; ignored on iOS. |
 | `saturation` | number | 1 | Android, Web | Saturation multiplier; ignored on iOS. |
 
@@ -124,7 +123,11 @@ For backdrop blur over a video, render the video with a `TextureView`, for examp
 
 ### Blur behind a modal
 
-Render an in-screen absolute overlay or portal and put a backdrop BlurView behind its modal card. Android backdrop blur cannot see through React Native's separate Modal window.
+Put a backdrop BlurView behind the modal card, either in an in-screen overlay or inside `<Modal transparent>` with a transparent root view. Both work on iOS and Android.
+
+### Animate intensity
+
+Use `Animated.createAnimatedComponent(BlurView)` with Reanimated's `useAnimatedProps(() => ({ intensity: value.value }))`. The ref is forwarded to the native view, so it runs on the UI thread.
 
 ### Blur looks flat on Android
 

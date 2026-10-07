@@ -36,7 +36,7 @@ ${code(`npx expo install ${PKG}\nnpx expo run:ios\nnpx expo run:android`, "sh")}
 const COMMON_FAQ = [
   ["Does it work in Expo Go?", "No. The package contains native code, so it needs a development build (<code>npx expo run:ios</code> / <code>npx expo run:android</code>) or EAS Build. React Native CLI apps work after <code>pod install</code> and a rebuild."],
   ["Does it work without Expo?", "Yes. Since 2.0 it is a plain React Native Fabric component, so a React Native CLI app only needs <code>npm install</code> and <code>pod install</code>."],
-  ["Which Android versions get a real blur?", "Android 12 (API 31) and later, where <code>RenderEffect</code> exists. Android 11 and earlier render the tint and glass rim without blur."],
+  ["Which Android versions get a real blur?", "Android 12 (API 31) and later, where <code>RenderEffect</code> exists. Android 11 and earlier draw a translucent material plate without blur, so content stays readable."],
 ];
 
 const pages = [
@@ -73,7 +73,7 @@ ${INSTALL}
   <tbody>
     <tr><td>React Native</td><td>0.76 with the New Architecture (Fabric). Tested with React Native 0.86.</td></tr>
     <tr><td>iOS</td><td>15.1</td></tr>
-    <tr><td>Android</td><td>API 31 (Android 12) for the blur. Older versions render tint and rim without blur.</td></tr>
+    <tr><td>Android</td><td>API 31 (Android 12) for the blur. Older versions draw a translucent material plate.</td></tr>
     <tr><td>Expo (optional)</td><td>Tested with Expo SDK 57</td></tr>
   </tbody>
 </table>
@@ -102,6 +102,7 @@ ${code(`import BlurView from "${PKG}";
   <li><a href="android-video-blur/"><strong>Blur a video on Android</strong><span>Why video stays sharp under most blur libraries, and how to blur it.</span></a></li>
   <li><a href="blur-modal-background/"><strong>Blurred modal background</strong><span>Blur the screen behind a modal, bottom sheet or popup.</span></a></li>
   <li><a href="expo-blur-alternative/"><strong>expo-blur alternative</strong><span>How this library compares with expo-blur and @react-native-community/blur.</span></a></li>
+  <li><a href="common-blur-issues/"><strong>Common blur issues and fixes</strong><span>Video stays sharp, grey Android blur, Modal, New Architecture crashes and more.</span></a></li>
 </ul>
 
 <h2 id="api">API</h2>
@@ -112,7 +113,7 @@ ${code(`import BlurView from "${PKG}";
     <tr><td><code>mode</code></td><td><code>'content' | 'backdrop'</code></td><td><code>'content'</code></td><td>iOS, Android</td><td><code>'backdrop'</code> blurs what is behind the view and keeps its children sharp. <code>'content'</code> blurs the children.</td></tr>
     <tr><td><code>intensity</code></td><td><code>number</code></td><td><code>50</code></td><td>iOS, Android, Web</td><td>Strength of the whole effect, 0 to 100. <code>0</code> disables it.</td></tr>
     <tr><td><code>tint</code></td><td><code>BlurTint</code></td><td><code>'default'</code></td><td>iOS, Android, Web</td><td>Material to use. See below.</td></tr>
-    <tr><td><code>tintColor</code></td><td><code>string</code></td><td>—</td><td>iOS, Android, Web</td><td>Extra colour layer over the blur, e.g. <code>'rgba(0,0,0,0.3)'</code>.</td></tr>
+    <tr><td><code>tintColor</code></td><td><code>ColorValue</code></td><td>—</td><td>iOS, Android, Web</td><td>Extra colour layer over the blur, e.g. <code>'rgba(0,0,0,0.3)'</code>.</td></tr>
     <tr><td><code>borderRadius</code></td><td><code>number</code></td><td><code>style.borderRadius</code> or <code>0</code></td><td>iOS, Android</td><td>Corner radius for blur, tint and rim.</td></tr>
     <tr><td><code>blurRadius</code></td><td><code>number</code></td><td>from <code>tint</code></td><td>Android, Web</td><td>Overrides the material's blur radius, in dp.</td></tr>
     <tr><td><code>saturation</code></td><td><code>number</code></td><td><code>1</code></td><td>Android, Web</td><td>Multiplier on the material's saturation boost.</td></tr>
@@ -145,9 +146,9 @@ ${code(`import BlurView from "${PKG}";
 
 <h2 id="limitations">Limitations</h2>
 <ul>
-  <li>Android 11 and below have no <code>RenderEffect</code>, so only tint and rim are drawn.</li>
+  <li>Android 11 and below have no <code>RenderEffect</code>, so they draw a translucent material plate instead of a blur.</li>
   <li><code>blurRadius</code> and <code>saturation</code> are ignored on iOS.</li>
-  <li>Backdrop mode on Android only sees its own window: it cannot blur behind React Native's <code>&lt;Modal&gt;</code>. Use an in-screen overlay.</li>
+  <li>Backdrop inside <code>&lt;Modal&gt;</code> on Android copies the screen behind with <code>PixelCopy</code> at about 30 fps, half resolution.</li>
   <li>Backdrop mode on Android cannot see a <code>SurfaceView</code> behind it. Use a <code>TextureView</code> video (<code>surfaceType="textureView"</code> in expo-video). Content mode blurs <code>SurfaceView</code> video fine.</li>
 </ul>`,
     faq: [
@@ -334,10 +335,17 @@ ${code(`<BottomSheet
   {content}
 </BottomSheet>`)}
 
-<h2>React Native &lt;Modal&gt; on Android</h2>
-<p>React Native's <code>&lt;Modal&gt;</code> opens a separate Android window, and backdrop mode only sees content in its own window. Inside a <code>&lt;Modal&gt;</code> the blur works on iOS but not on Android, so use an in-screen overlay or a portal when you need it on both platforms.</p>`,
+<h2>Inside React Native &lt;Modal&gt;</h2>
+<p>Backdrop mode also works inside <code>&lt;Modal transparent&gt;</code> on iOS and Android. Keep the modal's root view transparent, or the blur only sees that background:</p>
+${code(`<Modal transparent visible={visible}>
+  <View style={{ flex: 1 }}>
+    <BlurView mode="backdrop" intensity={60} tint="dark" style={StyleSheet.absoluteFill} />
+    <ModalCard />
+  </View>
+</Modal>`)}
+<p>On Android a <code>&lt;Modal&gt;</code> is a separate window. The library copies the activity window behind it with <code>PixelCopy</code> (about 30 fps, half resolution) and blurs the copy, so the screen behind the modal is blurred like on iOS.</p>`,
     faq: [
-      ["Why doesn't the blur work inside React Native Modal on Android?", "Modal opens a separate window on Android, and backdrop mode can only see its own window. Render the overlay in the same screen or through a portal instead."],
+      ["Does backdrop blur work inside React Native Modal on Android?", "Yes, since 2.1. Use <code>&lt;Modal transparent&gt;</code> with a transparent root view. The screen behind the modal window is copied with PixelCopy and blurred."],
       ...COMMON_FAQ,
     ],
   },
@@ -394,6 +402,56 @@ ${INSTALL}`,
     faq: [
       ["What is the best blur library for React Native?", "For Expo Go or iOS-only apps, expo-blur is the simplest. When Android must match iOS, when you blur video, or when you need frosted overlays on Android, @nguyenduy1412/react-native-blur covers those cases."],
       ["Does it support the New Architecture?", "Yes, and it requires it. @nguyenduy1412/react-native-blur is a Fabric native component generated with React Native Codegen."],
+      ...COMMON_FAQ,
+    ],
+  },
+  {
+    slug: "common-blur-issues/",
+    title: "Common React Native blur issues and fixes (expo-blur, @react-native-community/blur)",
+    nav: "Common issues",
+    description: "Fixes for the most reported React Native blur problems: video stays sharp on Android, grey flat Android blur, blur inside Modal, New Architecture crashes, BlurView 2.0.3 build failures, animating intensity and more.",
+    h1: "Common React Native blur issues and how to fix them",
+    lede: "The problems developers report most often in expo-blur and @react-native-community/blur, why they happen, and how @nguyenduy1412/react-native-blur handles each one.",
+    body: `
+<table>
+  <thead><tr><th>Problem</th><th>Why it happens</th><th>In this library</th></tr></thead>
+  <tbody>
+    <tr><td>Video stays sharp behind the blur on Android</td><td>Players draw into a <code>SurfaceView</code>, outside the view tree</td><td>SurfaceView frames are copied with PixelCopy and blurred</td></tr>
+    <tr><td>Android blur looks grey and flat</td><td>One Gaussian blur plus a flat tint</td><td>Per-material colour matrix calibrated against iOS (1.95 / 255 mean error)</td></tr>
+    <tr><td>Overlay shows only a tint on Android</td><td>A view-based blur over other views has nothing of its own to blur</td><td><code>mode="backdrop"</code> records and blurs what is behind the view</td></tr>
+    <tr><td>Blur does not work inside <code>&lt;Modal&gt;</code> on Android</td><td>Modal is a separate window</td><td>The activity window is copied with PixelCopy and blurred</td></tr>
+    <tr><td>Crashes or "not found in UIManager" on the New Architecture</td><td>Legacy bridge components</td><td>Native Fabric component generated with Codegen</td></tr>
+    <tr><td>Build fails: <code>Could not find BlurView-version-2.0.3.aar</code></td><td>Dependency on a JitPack artifact</td><td>No third-party native dependencies</td></tr>
+    <tr><td>Android 15 16 KB page size warnings</td><td>Prebuilt native <code>.so</code> libraries</td><td>Pure Kotlin and Swift, no native libraries</td></tr>
+    <tr><td>Cannot animate <code>intensity</code> with Reanimated</td><td>Ref or props land on a wrapper view</td><td>The ref is forwarded to the native view; <code>useAnimatedProps</code> works</td></tr>
+    <tr><td>Blur ignores the app's dark mode override on Android</td><td>Night-mode overrides are not dispatched to views</td><td>The current <code>Appearance</code> scheme is passed to the native view</td></tr>
+    <tr><td><code>borderTopLeftRadius</code> and other corners ignored</td><td>Only a uniform radius is applied</td><td>Per-corner radii clip the blur, tint and rim</td></tr>
+    <tr><td>Backdrop freezes while scrolling on Android 12</td><td>Android 12 caches the blurred layer of a reused RenderNode</td><td>A fresh RenderNode per frame on API 31-32</td></tr>
+    <tr><td>Blur strength changes after navigation or returning from background (iOS)</td><td>The paused animator behind <code>intensity</code> is reset</td><td>The effect is rebuilt when the view re-enters a window or the app returns to the foreground</td></tr>
+    <tr><td>Android 11 and older show an unreadable overlay</td><td>No RenderEffect, and no fallback</td><td>A translucent plate in the material's colour</td></tr>
+  </tbody>
+</table>
+
+<h2>Animate intensity with Reanimated</h2>
+${code(`import Animated, { useAnimatedProps, useSharedValue, withTiming } from "react-native-reanimated";
+import BlurView from "${PKG}";
+
+const AnimatedBlurView = Animated.createAnimatedComponent(BlurView);
+
+function Overlay({ visible }) {
+  const intensity = useSharedValue(0);
+  useEffect(() => {
+    intensity.value = withTiming(visible ? 80 : 0);
+  }, [visible]);
+  const animatedProps = useAnimatedProps(() => ({ intensity: intensity.value }));
+  return <AnimatedBlurView mode="backdrop" animatedProps={animatedProps} style={StyleSheet.absoluteFill} />;
+}`)}
+
+<h2>Install</h2>
+${INSTALL}`,
+    faq: [
+      ["Why is my BlurView grey on Android?", "Either the BlurView sits over other views in content mode (use <code>mode=\"backdrop\"</code>), the device runs Android 11 or earlier (no RenderEffect), or the library applies a flat tint. This library rebuilds iOS materials with a calibrated colour matrix."],
+      ["How do I fix 'Could not find BlurView-version-2.0.3.aar'?", "That error comes from libraries depending on Dimezis BlurView from JitPack. This library has no third-party native dependencies."],
       ...COMMON_FAQ,
     ],
   },

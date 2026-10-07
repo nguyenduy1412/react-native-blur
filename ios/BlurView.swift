@@ -20,12 +20,32 @@ final class BlurEffectView: UIVisualEffectView {
 
   init() {
     super.init(effect: nil)
+    // A paused animator can be finished by UIKit while the app is in the
+    // background, which leaves the blur at full strength. Rebuild it.
+    NotificationCenter.default.addObserver(
+      self,
+      selector: #selector(rebuildEffect),
+      name: UIApplication.willEnterForegroundNotification,
+      object: nil
+    )
   }
 
   required init?(coder aDecoder: NSCoder) { nil }
 
   deinit {
+    NotificationCenter.default.removeObserver(self)
     animator?.stopAnimation(true)
+  }
+
+  override func didMoveToWindow() {
+    super.didMoveToWindow()
+    // The animator is also torn down when the view leaves the window, for
+    // example during a navigation transition.
+    if window != nil { rebuildEffect() }
+  }
+
+  @objc private func rebuildEffect() {
+    setNeedsDisplay()
   }
 
   override func draw(_ rect: CGRect) {
@@ -50,8 +70,8 @@ public class BlurView: UIView {
 
   private var intensity: Double = 50.0
   private var tintStyleString: String = "default"
-  private var customTintColorString: String?
-  private var cornerRadius: Double = 0.0
+  // Top-left, top-right, bottom-right, bottom-left, in points.
+  private var cornerRadii: [CGFloat] = [0, 0, 0, 0]
 
   @objc public override init(frame: CGRect) {
     super.init(frame: frame)
@@ -73,26 +93,36 @@ public class BlurView: UIView {
     tintOverlayView.isUserInteractionEnabled = false
     addSubview(tintOverlayView)
 
+    specularBorderLayer.colors = [
+      UIColor(white: 1.0, alpha: 0.45).cgColor,
+      UIColor(white: 1.0, alpha: 0.15).cgColor,
+      UIColor(white: 1.0, alpha: 0.05).cgColor
+    ]
+    specularBorderLayer.startPoint = CGPoint(x: 0.5, y: 0.0)
+    specularBorderLayer.endPoint = CGPoint(x: 0.5, y: 1.0)
+    borderShapeMask.fillColor = UIColor.clear.cgColor
+    borderShapeMask.strokeColor = UIColor.white.cgColor
+    borderShapeMask.lineWidth = 0.5
+    specularBorderLayer.mask = borderShapeMask
+    layer.addSublayer(specularBorderLayer)
+
     if let sdfLayer = GlassSDF.makeHighlightLayer() {
       layer.addSublayer(sdfLayer)
       sdfHighlightLayer = sdfLayer
-    } else {
-      specularBorderLayer.colors = [
-        UIColor(white: 1.0, alpha: 0.45).cgColor,
-        UIColor(white: 1.0, alpha: 0.15).cgColor,
-        UIColor(white: 1.0, alpha: 0.05).cgColor
-      ]
-      specularBorderLayer.startPoint = CGPoint(x: 0.5, y: 0.0)
-      specularBorderLayer.endPoint = CGPoint(x: 0.5, y: 1.0)
-
-      borderShapeMask.fillColor = UIColor.clear.cgColor
-      borderShapeMask.strokeColor = UIColor.white.cgColor
-      borderShapeMask.lineWidth = 0.5
-      specularBorderLayer.mask = borderShapeMask
-      layer.addSublayer(specularBorderLayer)
     }
 
+    layer.cornerCurve = .continuous
+    blurEffectView.layer.cornerCurve = .continuous
+
     applyBlur()
+  }
+
+  private var hasUniformCorners: Bool {
+    cornerRadii.allSatisfy { $0 == cornerRadii[0] }
+  }
+
+  private func clampedRadius(_ radius: CGFloat) -> CGFloat {
+    min(radius, min(bounds.width, bounds.height) / 2)
   }
 
   public override func layoutSubviews() {
@@ -101,27 +131,52 @@ public class BlurView: UIView {
 
     blurEffectView.frame = b
     tintOverlayView.frame = b
-    layer.cornerRadius = effectiveRadius
-    blurEffectView.layer.cornerRadius = effectiveRadius
 
-    if let sdfLayer = sdfHighlightLayer {
-      GlassSDF.update(sdfLayer, bounds: b, cornerRadius: effectiveRadius, intensity: intensity)
+    // Uniform corners use the layer's continuous corner curve. Other shapes
+    // are clipped by the React Native container (overflow: hidden), and only
+    // the rim needs the exact path.
+    let uniformRadius = hasUniformCorners ? clampedRadius(cornerRadii[0]) : 0
+    layer.cornerRadius = uniformRadius
+    blurEffectView.layer.cornerRadius = uniformRadius
+
+    let useSDF = sdfHighlightLayer != nil && hasUniformCorners
+    let rimVisible = intensity > 0
+    sdfHighlightLayer?.isHidden = !useSDF || !rimVisible
+    specularBorderLayer.isHidden = useSDF || !rimVisible
+    if let sdfLayer = sdfHighlightLayer, useSDF {
+      GlassSDF.update(sdfLayer, bounds: b, cornerRadius: uniformRadius, intensity: intensity)
       return
     }
 
+    CATransaction.begin()
+    CATransaction.setDisableActions(true)
     specularBorderLayer.frame = b
-    updateBorderPath()
+    specularBorderLayer.opacity = Float(max(0.0, min(1.0, intensity / 100.0)))
+    borderShapeMask.frame = b
+    borderShapeMask.path = borderPath(in: b.insetBy(dx: 0.25, dy: 0.25)).cgPath
+    CATransaction.commit()
   }
 
-  private var effectiveRadius: CGFloat {
-    min(CGFloat(cornerRadius), min(bounds.width, bounds.height) / 2)
-  }
-
-  private func updateBorderPath() {
-    let insetBounds = bounds.insetBy(dx: 0.25, dy: 0.25)
-    let path = UIBezierPath(roundedRect: insetBounds, cornerRadius: effectiveRadius)
-    borderShapeMask.path = path.cgPath
-    borderShapeMask.frame = bounds
+  private func borderPath(in rect: CGRect) -> UIBezierPath {
+    if hasUniformCorners {
+      return UIBezierPath(roundedRect: rect, cornerRadius: clampedRadius(cornerRadii[0]))
+    }
+    let tl = clampedRadius(cornerRadii[0])
+    let tr = clampedRadius(cornerRadii[1])
+    let br = clampedRadius(cornerRadii[2])
+    let bl = clampedRadius(cornerRadii[3])
+    let path = UIBezierPath()
+    path.move(to: CGPoint(x: rect.minX + tl, y: rect.minY))
+    path.addLine(to: CGPoint(x: rect.maxX - tr, y: rect.minY))
+    path.addArc(withCenter: CGPoint(x: rect.maxX - tr, y: rect.minY + tr), radius: tr, startAngle: -.pi / 2, endAngle: 0, clockwise: true)
+    path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY - br))
+    path.addArc(withCenter: CGPoint(x: rect.maxX - br, y: rect.maxY - br), radius: br, startAngle: 0, endAngle: .pi / 2, clockwise: true)
+    path.addLine(to: CGPoint(x: rect.minX + bl, y: rect.maxY))
+    path.addArc(withCenter: CGPoint(x: rect.minX + bl, y: rect.maxY - bl), radius: bl, startAngle: .pi / 2, endAngle: .pi, clockwise: true)
+    path.addLine(to: CGPoint(x: rect.minX, y: rect.minY + tl))
+    path.addArc(withCenter: CGPoint(x: rect.minX + tl, y: rect.minY + tl), radius: tl, startAngle: .pi, endAngle: .pi * 1.5, clockwise: true)
+    path.close()
+    return path
   }
 
   @objc public func setIntensity(_ intensity: Double) {
@@ -134,16 +189,13 @@ public class BlurView: UIView {
     applyBlur()
   }
 
-  @objc(setBlurTintColor:) public func setTintColor(_ colorStr: String?) {
-    self.customTintColorString = colorStr
-    updateTintOverlay()
+  @objc(setBlurTintColor:) public func setTintColor(_ color: UIColor?) {
+    tintOverlayView.backgroundColor = color ?? .clear
   }
 
-  @objc public func setCornerRadius(_ radius: Double) {
-    self.cornerRadius = max(0.0, radius)
-    layer.cornerCurve = .continuous
-    blurEffectView.layer.cornerCurve = .continuous
-    updateBorderPath()
+  @objc public func setCornerRadii(_ radii: [NSNumber]) {
+    let values = radii.map { CGFloat(max(0.0, $0.doubleValue)) }
+    cornerRadii = values.count == 4 ? values : [values.first ?? 0, values.first ?? 0, values.first ?? 0, values.first ?? 0]
     setNeedsLayout()
   }
 
@@ -151,15 +203,7 @@ public class BlurView: UIView {
     blurEffectView.style = resolveBlurStyle(from: tintStyleString)
     blurEffectView.intensity = intensity / 100.0
     blurEffectView.isHidden = intensity <= 0.0
-    updateTintOverlay()
-
-    if sdfHighlightLayer != nil {
-      setNeedsLayout()
-    }
-  }
-
-  private func updateTintOverlay() {
-    tintOverlayView.backgroundColor = customTintColorString.flatMap(parseColor) ?? .clear
+    setNeedsLayout()
   }
 
   private func resolveBlurStyle(from tintName: String) -> UIBlurEffect.Style {
@@ -185,31 +229,5 @@ public class BlurView: UIView {
     default:
       return .regular
     }
-  }
-
-  private func parseColor(_ colorStr: String) -> UIColor? {
-    let trimmed = colorStr.trimmingCharacters(in: .whitespacesAndNewlines)
-    if trimmed.hasPrefix("#") {
-      var hexInt: UInt64 = 0
-      let scanner = Scanner(string: String(trimmed.dropFirst()))
-      if scanner.scanHexInt64(&hexInt) {
-        if trimmed.count == 7 {
-          return UIColor(
-            red: CGFloat((hexInt >> 16) & 0xFF) / 255.0,
-            green: CGFloat((hexInt >> 8) & 0xFF) / 255.0,
-            blue: CGFloat(hexInt & 0xFF) / 255.0,
-            alpha: 1.0
-          )
-        } else if trimmed.count == 9 {
-          return UIColor(
-            red: CGFloat((hexInt >> 24) & 0xFF) / 255.0,
-            green: CGFloat((hexInt >> 16) & 0xFF) / 255.0,
-            blue: CGFloat((hexInt >> 8) & 0xFF) / 255.0,
-            alpha: CGFloat(hexInt & 0xFF) / 255.0
-          )
-        }
-      }
-    }
-    return nil
   }
 }

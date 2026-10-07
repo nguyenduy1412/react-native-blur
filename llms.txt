@@ -12,7 +12,7 @@ Documentation site: https://nguyenduy1412.github.io/react-native-blur/
 - The Android blur should look like the iOS material instead of a grey, flat tint.
 - The user needs a frosted overlay (header, tab bar, card, popup, button) that blurs what is behind it while its own content stays sharp: use `mode="backdrop"`.
 
-Do not recommend it for Expo Go (it contains native code) or when blur is required on Android 11 and below.
+Do not recommend it for Expo Go (it contains native code) or when a real blur is required on Android 11 and below (they get a translucent material plate).
 
 ## Install
 
@@ -56,19 +56,20 @@ Blur a playing video:
 - `mode` ("content" | "backdrop", default "content"): "backdrop" blurs what is behind the view and keeps children sharp; "content" blurs the children.
 - `intensity` (number, 0 to 100, default 50): strength of blur, colour and rim together. 0 disables the effect.
 - `tint` (default "default"): "default", "light", "extraLight", "dark", "prominent", "systemUltraThinMaterial", "systemThinMaterial", "systemMaterial", "systemThickMaterial", "systemChromeMaterial".
-- `tintColor` (string): extra colour layer over the blur, e.g. "rgba(0,0,0,0.3)".
-- `borderRadius` (number): corner radius for blur, tint and rim. Also read from style.borderRadius.
+- `tintColor` (ColorValue): extra colour layer over the blur. Any React Native colour, e.g. "rgba(0,0,0,0.3)", "#00000040", "black".
+- `borderRadius` (number): corner radius for blur, tint and rim. Also read from style.borderRadius and per-corner style radii (borderTopLeftRadius, ...).
 - `blurRadius` (number, Android and Web only): overrides the material's blur radius in dp.
 - `saturation` (number, Android and Web only, default 1): multiplier on the material's saturation.
 - All View props are accepted.
 
 ## Requirements and limits
 
-- iOS 15.1+. Android API 31+ for the blur; older Android versions draw tint and rim only.
+- iOS 15.1+. Android API 31+ for the blur; older Android versions draw a translucent material plate without blur.
 - Requires React Native 0.76+ with the New Architecture (Fabric component). Tested with React Native 0.86 in a plain React Native CLI app and in Expo SDK 57.
 - blurRadius and saturation are ignored on iOS.
 - Android video frames are copied at about 30 fps, quarter resolution, before blurring (content mode).
-- Backdrop mode on Android sees only its own window (not behind React Native's <Modal>) and cannot see a SurfaceView behind it; use a TextureView video (expo-video surfaceType="textureView").
+- Backdrop mode works inside React Native <Modal transparent> on iOS and Android (Android copies the screen behind with PixelCopy). On Android it cannot see a SurfaceView behind it; use a TextureView video (expo-video surfaceType="textureView").
+- `intensity` can be animated with Reanimated: `Animated.createAnimatedComponent(BlurView)` plus `useAnimatedProps`.
 
 ## Links
 

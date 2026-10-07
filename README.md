@@ -29,7 +29,9 @@ Blur what is behind headers, tab bars, cards, popups and buttons while their con
 - 🤖 **Android matched to iOS.** A `RenderEffect` chain (Gaussian blur, then a colour matrix) per material, calibrated against iOS screenshots: mean error **1.95 / 255** across 187 sampled colours.
 - ✨ **Glass edge.** A specular rim highlight gives the "glass has thickness" look.
 - 🌗 **Light and dark aware.** Material tints follow the system appearance on Android.
-- 🎚️ **One `intensity` prop** from 0 to 100 drives blur, colour and rim together.
+- 🎚️ **One `intensity` prop** from 0 to 100 drives blur, colour and rim together, and animates with Reanimated on the UI thread.
+- 🪟 **Works inside React Native `<Modal>`** on Android too: backdrop mode blurs the screen behind the modal.
+- 🔲 **Per-corner radii** (`borderTopLeftRadius`…) clip the blur, tint and glass rim.
 - 🌐 **Web fallback** with CSS `backdrop-filter`.
 - 📦 **Works everywhere**: a native Fabric component for React Native CLI and Expo apps alike, with no JS dependencies and no Expo requirement.
 
@@ -71,7 +73,7 @@ bun add @nguyenduy1412/react-native-blur
 | --- | --- |
 | React Native | 0.76 with the New Architecture (Fabric). Tested with React Native 0.86. |
 | iOS | 15.1 |
-| Android | API 31 (Android 12) for the blur. Older versions render the tint and rim without blur. |
+| Android | API 31 (Android 12) for the blur. Older versions draw a translucent material plate without blur, so content stays readable. |
 | Expo (optional) | Tested with Expo SDK 57 |
 
 ## Quick start
@@ -196,6 +198,22 @@ Content mode picks up `SurfaceView` players automatically.
 </BlurView>
 ```
 
+### Animate the blur with Reanimated
+
+`BlurView` forwards its ref to the native view, so `intensity` animates on the UI thread:
+
+```tsx
+import Animated, { useAnimatedProps, useSharedValue, withTiming } from "react-native-reanimated";
+
+const AnimatedBlurView = Animated.createAnimatedComponent(BlurView);
+
+const intensity = useSharedValue(0);
+const animatedProps = useAnimatedProps(() => ({ intensity: intensity.value }));
+
+<AnimatedBlurView mode="backdrop" animatedProps={animatedProps} style={StyleSheet.absoluteFill} />;
+// intensity.value = withTiming(80);
+```
+
 ## Why another blur library?
 
 Most blur libraries for React Native look fine over a static screen and break down in three places.
@@ -243,8 +261,8 @@ Accepts every `View` prop, plus:
 | `mode` | `'content' \| 'backdrop'` | `'content'` | iOS, Android | `'backdrop'` blurs what is behind the view and keeps its children sharp. `'content'` blurs the children. |
 | `intensity` | `number` | `50` | iOS, Android, Web | Strength of the whole effect, `0` to `100`. Scales blur, colour and rim together. `0` disables it. |
 | `tint` | `BlurTint` | `'default'` | iOS, Android, Web | Material to use. See the table below. |
-| `tintColor` | `string` | — | iOS, Android, Web | Extra colour layer drawn over the blur, for example `'rgba(0,0,0,0.3)'`. |
-| `borderRadius` | `number` | `style.borderRadius` or `0` | iOS, Android | Corner radius for the blur, tint and rim. |
+| `tintColor` | `ColorValue` | — | iOS, Android, Web | Extra colour layer drawn over the blur. Any React Native colour: `'rgba(0,0,0,0.3)'`, `'#00000040'`, `'black'`, `PlatformColor(...)`. |
+| `borderRadius` | `number` | `style.borderRadius` or `0` | iOS, Android | Corner radius for the blur, tint and rim. Per-corner style radii (`borderTopLeftRadius`, `borderTopStartRadius`…) are supported too. |
 | `blurRadius` | `number` | from `tint` | Android, Web | Overrides the material's blur radius, in dp. |
 | `saturation` | `number` | `1` | Android, Web | Multiplier on the material's saturation boost. |
 | `children` | `ReactNode` | — | all | The content to blur. |
@@ -278,11 +296,11 @@ Accepts every `View` prop, plus:
 
 ## Limitations
 
-- **Android 11 and below** have no `RenderEffect`, so only the tint and rim are drawn.
+- **Android 11 and below** have no `RenderEffect`, so they draw a translucent plate in the material's colour instead of a blur.
 - **`blurRadius` and `saturation`** are ignored on iOS, which uses the system material as is.
 - **Video copies on Android** refresh at about 30 fps at quarter resolution. That is invisible once blurred, but you will notice it at a very low `intensity`.
 - **Colour fidelity:** Android fits each iOS luminance curve with a single colour matrix, so it averages about 2 / 255 off iOS. `systemChromeMaterial` is the outlier, at up to about 23 / 255.
-- **Backdrop mode on Android only sees its own window.** Inside React Native's `<Modal>` (a separate window) it cannot blur the screen behind; use an in-screen overlay instead.
+- **Backdrop inside `<Modal>` on Android** copies the screen behind the modal with `PixelCopy` at about 30 fps and half resolution, then blurs it.
 - **Backdrop mode on Android cannot see a `SurfaceView` behind it.** Render the video with a `TextureView` instead, for example `<VideoView surfaceType="textureView" />` in expo-video. Content mode blurs `SurfaceView` video fine.
 
 ## FAQ
@@ -328,14 +346,14 @@ A single Gaussian blur plus a flat tint washes out the colours. This library reb
 Check two things:
 
 1. **Use `mode="backdrop"` for overlays.** The default `mode="content"` blurs the view's own children, so a `BlurView` laid over other views has nothing of its own to blur. `mode="backdrop"` blurs what is behind it.
-2. **The device must run Android 12 (API 31) or later.** `RenderEffect` does not exist on older versions, so they get the tint and rim only.
+2. **The device must run Android 12 (API 31) or later.** `RenderEffect` does not exist on older versions, so they get a translucent material plate instead of a blur.
 
 </details>
 
 <details>
 <summary><b>How do I blur the screen behind a modal or overlay?</b></summary>
 
-Render the overlay in the same screen (an absolutely positioned view, or a portal) and put a backdrop `BlurView` behind its content. The screen underneath is blurred and the overlay content stays sharp.
+Put a backdrop `BlurView` behind the overlay content, either in an in-screen overlay or inside a transparent React Native `<Modal>`. The screen underneath is blurred and the overlay content stays sharp.
 
 ```tsx
 <View style={{ flex: 1 }}>
@@ -349,7 +367,16 @@ Render the overlay in the same screen (an absolutely positioned view, or a porta
 </View>
 ```
 
-On Android, React Native's `<Modal>` opens a separate window, and backdrop mode only sees content in its own window. Inside a `<Modal>` it works on iOS but not on Android, so prefer an in-screen overlay when you need the blur on both platforms.
+It also works inside `<Modal transparent>` on both platforms. Keep the modal's root view transparent so the blur is visible:
+
+```tsx
+<Modal transparent visible={visible}>
+  <View style={{ flex: 1 }}>
+    <BlurView mode="backdrop" intensity={60} style={StyleSheet.absoluteFill} />
+    <ModalCard />
+  </View>
+</Modal>
+```
 
 </details>
 

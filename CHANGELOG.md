@@ -2,6 +2,30 @@
 
 All notable changes to `@nguyenduy1412/react-native-blur` are listed here. The project follows [Semantic Versioning](https://semver.org).
 
+## 2.1.0 (2026-10-08)
+
+### Features
+
+- Backdrop mode works inside React Native `<Modal>` on Android. The screen behind the modal window is copied with `PixelCopy` and blurred, as on iOS.
+- Per-corner radii: `borderTopLeftRadius`, `borderTopStartRadius` and the other corner styles clip the blur, tint and glass rim.
+- `tintColor` accepts any React Native colour (`ColorValue`): `rgba()`, `#RRGGBBAA`, named colours and `PlatformColor`.
+- `BlurView` forwards its ref to the native view, so `intensity` can be animated with Reanimated (`Animated.createAnimatedComponent` + `useAnimatedProps`) on the UI thread.
+- Android 11 and below draw a translucent plate in the material's colour instead of an almost invisible overlay.
+
+### Bug fixes
+
+- Android 12 (API 31-32): the backdrop froze while content behind it scrolled. Android 12 kept the blurred layer of a reused `RenderNode`; a fresh node is used per frame there.
+- Android: materials now follow `Appearance.setColorScheme` overrides and light/dark switches while the app is running.
+- Android: changing `tint`, `blurRadius` or `saturation` in backdrop mode redraws immediately.
+- Android: `#RRGGBBAA` colours were read as `#AARRGGBB`.
+- iOS: `tintColor` values such as `rgba(...)` and named colours were ignored; only `#RRGGBB` worked.
+- iOS: the blur effect is rebuilt when the view re-enters a window or the app returns to the foreground, so `intensity` stays consistent after navigation.
+- iOS: the glass rim is hidden at `intensity={0}`.
+
+### Other
+
+- Example app in `example/` (React Native CLI 0.86, Reanimated) covering every case above.
+
 ## 2.0.3 (2026-10-07)
 
 ### Documentation

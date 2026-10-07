@@ -1,11 +1,13 @@
 import React from 'react';
 import {
-  Platform,
+  I18nManager,
   View,
+  type ColorValue,
   ViewProps,
   ViewStyle,
   StyleSheet,
   StyleProp,
+  useColorScheme,
 } from 'react-native';
 import NativeBlurView from './src/NguyenduyBlurViewNativeComponent';
 
@@ -27,7 +29,7 @@ export interface BlurViewProps extends ViewProps {
   mode?: BlurMode;
   intensity?: number;
   tint?: BlurTint;
-  tintColor?: string;
+  tintColor?: ColorValue;
   blurRadius?: number;
   saturation?: number;
   borderRadius?: number;
@@ -35,69 +37,71 @@ export interface BlurViewProps extends ViewProps {
   style?: StyleProp<ViewStyle>;
 }
 
-export const BlurView: React.FC<BlurViewProps> = ({
-  mode = 'content',
-  intensity = 50,
-  tint = 'default',
-  tintColor,
-  blurRadius,
-  saturation,
-  borderRadius: customBorderRadius,
-  style,
-  children,
-  ...props
-}) => {
+type Radius = ViewStyle['borderRadius'];
+
+const radius = (...values: Radius[]): number | undefined => {
+  for (const value of values) {
+    if (typeof value === 'number') return value;
+  }
+  return undefined;
+};
+
+// Resolves the four corner radii (top-left, top-right, bottom-right,
+// bottom-left) from `borderRadius` and the per-corner style properties.
+function resolveCornerRadii(style: ViewStyle, override?: number): number[] {
+  const rtl = I18nManager.isRTL;
+  const base = override ?? radius(style.borderRadius) ?? 0;
+  const topStart = radius(style.borderTopStartRadius, style.borderStartStartRadius);
+  const topEnd = radius(style.borderTopEndRadius, style.borderStartEndRadius);
+  const bottomStart = radius(style.borderBottomStartRadius, style.borderEndStartRadius);
+  const bottomEnd = radius(style.borderBottomEndRadius, style.borderEndEndRadius);
+  if (override !== undefined) return [base, base, base, base];
+  return [
+    radius(rtl ? topEnd : topStart, style.borderTopLeftRadius) ?? base,
+    radius(rtl ? topStart : topEnd, style.borderTopRightRadius) ?? base,
+    radius(rtl ? bottomStart : bottomEnd, style.borderBottomRightRadius) ?? base,
+    radius(rtl ? bottomEnd : bottomStart, style.borderBottomLeftRadius) ?? base,
+  ];
+}
+
+export const BlurView = React.forwardRef<View, BlurViewProps>(function BlurView(
+  {
+    mode = 'content',
+    intensity = 50,
+    tint = 'default',
+    tintColor,
+    blurRadius,
+    saturation,
+    borderRadius: customBorderRadius,
+    style,
+    children,
+    ...props
+  },
+  ref,
+) {
   const flattenedStyle = (StyleSheet.flatten(style) || {}) as ViewStyle;
-  const computedBorderRadius =
-    customBorderRadius ??
-    (flattenedStyle.borderRadius as number) ??
-    0;
+  const colorScheme = useColorScheme();
 
   if (NativeBlurView) {
-    const nativeProps = {
-      mode,
-      intensity,
-      blurRadius,
-      saturation,
-      tint,
-      tintColor,
-      cornerRadius: computedBorderRadius,
-    };
-    const containerStyle = [
-      styles.container,
-      style,
-      computedBorderRadius > 0 && {
-        borderRadius: computedBorderRadius,
-        overflow: 'hidden' as const,
-      },
-    ];
-
-    if (Platform.OS === 'ios' || mode === 'backdrop') {
-      return (
-        <View style={containerStyle} {...props}>
-          {mode === 'backdrop' && (
-            <NativeBlurView
-              {...nativeProps}
-              style={StyleSheet.absoluteFill}
-              pointerEvents="none"
-            />
-          )}
-          {children}
-          {mode !== 'backdrop' && (
-            <NativeBlurView
-              {...nativeProps}
-              style={StyleSheet.absoluteFill}
-              pointerEvents="none"
-            />
-          )}
-        </View>
-      );
-    }
-
+    const cornerRadii = resolveCornerRadii(flattenedStyle, customBorderRadius);
+    const rounded = cornerRadii.some((r) => r > 0);
     return (
       <NativeBlurView
-        {...nativeProps}
-        style={containerStyle}
+        ref={ref as React.Ref<any>}
+        mode={mode}
+        intensity={intensity}
+        blurRadius={blurRadius}
+        saturation={saturation}
+        tint={tint}
+        tintColor={tintColor}
+        cornerRadii={cornerRadii}
+        colorScheme={colorScheme ?? undefined}
+        style={[
+          styles.container,
+          style,
+          customBorderRadius !== undefined && { borderRadius: customBorderRadius },
+          rounded && styles.clip,
+        ]}
         {...props}
       >
         {children}
@@ -107,6 +111,7 @@ export const BlurView: React.FC<BlurViewProps> = ({
 
   return (
     <View
+      ref={ref}
       style={[
         styles.container,
         {
@@ -119,17 +124,21 @@ export const BlurView: React.FC<BlurViewProps> = ({
               : 'rgba(255, 255, 255, 0.4)'),
         },
         style,
+        customBorderRadius !== undefined && { borderRadius: customBorderRadius },
       ]}
       {...props}
     >
       {children}
     </View>
   );
-};
+});
 
 const styles = StyleSheet.create({
   container: {
     backgroundColor: 'transparent',
+  },
+  clip: {
+    overflow: 'hidden',
   },
 });
 

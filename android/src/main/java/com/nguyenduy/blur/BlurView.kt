@@ -10,6 +10,8 @@ import android.graphics.ColorMatrixColorFilter
 import android.graphics.LinearGradient
 import android.graphics.Outline
 import android.graphics.Paint
+import android.graphics.Path
+import android.graphics.Rect
 import android.graphics.RectF
 import android.graphics.RenderEffect
 import android.graphics.RenderNode
@@ -25,6 +27,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.ViewOutlineProvider
 import android.view.ViewTreeObserver
+import com.facebook.react.bridge.ReactContext
 import com.facebook.react.views.view.ReactViewGroup
 
 private class Material(
@@ -62,6 +65,7 @@ private const val LUMA_B = 0.072f
 private const val SKIA_RADIUS_TO_SIGMA = 0.57735f
 private const val SURFACE_MIRROR_DOWNSCALE = 4
 private const val SURFACE_MIRROR_INTERVAL_NANOS = 33_000_000L
+private const val WINDOW_MIRROR_DOWNSCALE = 2
 
 private class SurfaceMirror(val view: SurfaceView) {
     val frames = arrayOfNulls<BitmapDrawable>(2)
@@ -94,11 +98,25 @@ class BlurView(context: Context) : ReactViewGroup(context) {
     private var customBlurRadius: Float? = null
     private var saturationBoost: Float = 1f
     private var tint: String = "default"
-    private var cornerRadius: Float = 0f
+    // Corner radii in px: top-left, top-right, bottom-right, bottom-left.
+    private val cornerRadii = FloatArray(4)
+    private val cornerPath = Path()
+    // 'light' or 'dark' from React Native's Appearance; overrides the
+    // configuration, which AppCompat night-mode overrides do not dispatch to views.
+    private var colorScheme: String? = null
+    private var nightMode = isNight(resources.configuration)
     private var blurEffect: RenderEffect? = null
     private var appliedEffect: RenderEffect? = null
     private var backdropMode = false
     private var backdropNode: RenderNode? = null
+
+    // Backdrop inside another window (React Native <Modal>): the activity
+    // window behind it is copied with PixelCopy and drawn under the siblings.
+    private var windowMirror: BitmapDrawable? = null
+    private var windowMirrorPending: BitmapDrawable? = null
+    private var windowMirrorCopying = false
+    private val windowMirrorRect = Rect()
+    private val windowLocation = IntArray(2)
 
     private val surfaceMirrors = mutableMapOf<SurfaceView, SurfaceMirror>()
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -117,6 +135,7 @@ class BlurView(context: Context) : ReactViewGroup(context) {
             if (frameTimeNanos - lastMirrorNanos >= SURFACE_MIRROR_INTERVAL_NANOS) {
                 lastMirrorNanos = frameTimeNanos
                 surfaceMirrors.values.forEach(::copySurface)
+                copyActivityWindow()
             }
             Choreographer.getInstance().postFrameCallback(this)
         }
@@ -134,6 +153,9 @@ class BlurView(context: Context) : ReactViewGroup(context) {
 
     private val drawRect = RectF()
     private val rimRect = RectF()
+    private val rimPath = Path()
+
+    private val fallbackPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
 
     val blurContent = BlurContentView(context) { applyEffects() }
 
@@ -155,37 +177,71 @@ class BlurView(context: Context) : ReactViewGroup(context) {
     fun setBlurRadius(radius: Double) {
         this.customBlurRadius = if (radius > 0) radius.toFloat() else null
         applyEffects()
+        invalidate()
     }
 
     fun setSaturation(saturation: Double) {
         this.saturationBoost = saturation.toFloat().coerceAtLeast(0f)
         applyEffects()
+        invalidate()
     }
 
     fun setTint(tint: String) {
         this.tint = tint
         applyEffects()
+        invalidate()
     }
 
-    fun setTintColor(colorStr: String?) {
-        tintPaint.color = colorStr?.takeIf { it.isNotBlank() }
-            ?.let { runCatching { parseColor(it) }.getOrNull() }
-            ?: Color.TRANSPARENT
+    fun setTintColor(color: Int?) {
+        tintPaint.color = color ?: Color.TRANSPARENT
         invalidate()
     }
 
     fun setMode(mode: String) {
         backdropMode = mode.equals("backdrop", ignoreCase = true)
         applyEffects()
+        syncWindowMirror()
         invalidate()
     }
 
-    fun setCornerRadius(radius: Double) {
-        this.cornerRadius = radius.toFloat().coerceAtLeast(0f) * density
+    fun setCornerRadii(radii: List<Double>) {
+        for (index in 0 until 4) {
+            val value = radii.getOrNull(index) ?: radii.firstOrNull() ?: 0.0
+            cornerRadii[index] = value.toFloat().coerceAtLeast(0f) * density
+        }
         updateOutline()
         updateShaders()
         invalidate()
     }
+
+    fun setColorScheme(scheme: String?) {
+        colorScheme = scheme?.takeIf { it == "light" || it == "dark" }
+        updateNightMode(resources.configuration)
+    }
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        updateNightMode(newConfig)
+    }
+
+    private fun updateNightMode(config: Configuration) {
+        val night = isNight(config)
+        if (night != nightMode) {
+            nightMode = night
+            applyEffects()
+            invalidate()
+        }
+    }
+
+    private fun isNight(config: Configuration) = when (colorScheme) {
+        "dark" -> true
+        "light" -> false
+        else -> config.uiMode and Configuration.UI_MODE_NIGHT_MASK == Configuration.UI_MODE_NIGHT_YES
+    }
+
+    private val hasUniformCorners get() = cornerRadii.all { it == cornerRadii[0] }
+
+    private val hasCorners get() = cornerRadii.any { it > 0f }
 
     override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
         super.onLayout(changed, left, top, right, bottom)
@@ -201,13 +257,17 @@ class BlurView(context: Context) : ReactViewGroup(context) {
         super.onAttachedToWindow()
         viewTreeObserver.addOnGlobalLayoutListener(layoutListener)
         viewTreeObserver.addOnPreDrawListener(preDrawListener)
+        updateNightMode(resources.configuration)
         syncSurfaceMirrors()
+        syncWindowMirror()
     }
 
     override fun onDetachedFromWindow() {
         viewTreeObserver.removeOnGlobalLayoutListener(layoutListener)
         viewTreeObserver.removeOnPreDrawListener(preDrawListener)
         surfaceMirrors.keys.toList().forEach(::releaseMirror)
+        windowMirror = null
+        windowMirrorPending = null
         stopMirrorLoop()
         super.onDetachedFromWindow()
     }
@@ -218,7 +278,68 @@ class BlurView(context: Context) : ReactViewGroup(context) {
         val found = if (blurEffect != null && !backdropMode && isAttachedToWindow) collectSurfaceViews(this, mutableListOf()) else emptyList()
         (surfaceMirrors.keys - found.toSet()).forEach(::releaseMirror)
         found.forEach { surfaceMirrors.getOrPut(it) { SurfaceMirror(it) } }
-        if (surfaceMirrors.isEmpty()) stopMirrorLoop() else startMirrorLoop()
+        updateMirrorLoop()
+    }
+
+    private fun updateMirrorLoop() {
+        if (surfaceMirrors.isEmpty() && !needsWindowMirror()) stopMirrorLoop() else startMirrorLoop()
+    }
+
+    private fun activityWindow() = ((context as? ReactContext)?.currentActivity)?.window
+
+    private fun needsWindowMirror(): Boolean {
+        if (!backdropMode || blurEffect == null || !isAttachedToWindow) return false
+        val window = activityWindow() ?: return false
+        return rootView !== window.decorView
+    }
+
+    private fun syncWindowMirror() {
+        if (!needsWindowMirror()) {
+            windowMirror = null
+            windowMirrorPending = null
+        }
+        updateMirrorLoop()
+    }
+
+    private fun copyActivityWindow() {
+        if (windowMirrorCopying || !needsWindowMirror() || width <= 0 || height <= 0) return
+        val window = activityWindow() ?: return
+        val decor = window.decorView
+        if (!decor.isAttachedToWindow || decor.width <= 0) return
+        getLocationOnScreen(windowLocation)
+        val left = windowLocation[0]
+        val top = windowLocation[1]
+        decor.getLocationOnScreen(windowLocation)
+        windowMirrorRect.set(left - windowLocation[0], top - windowLocation[1], 0, 0)
+        windowMirrorRect.right = windowMirrorRect.left + width
+        windowMirrorRect.bottom = windowMirrorRect.top + height
+        if (!windowMirrorRect.intersect(0, 0, decor.width, decor.height)) return
+        val w = (windowMirrorRect.width() / WINDOW_MIRROR_DOWNSCALE).coerceAtLeast(1)
+        val h = (windowMirrorRect.height() / WINDOW_MIRROR_DOWNSCALE).coerceAtLeast(1)
+        val target = windowMirrorPending?.takeIf { it.bitmap.width == w && it.bitmap.height == h }
+            ?: BitmapDrawable(resources, Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)).also { it.isFilterBitmap = true }
+        val dest = Rect(
+            windowMirrorRect.left - (left - windowLocation[0]),
+            windowMirrorRect.top - (top - windowLocation[1]),
+            0, 0
+        )
+        dest.right = dest.left + windowMirrorRect.width()
+        dest.bottom = dest.top + windowMirrorRect.height()
+        windowMirrorCopying = true
+        try {
+            PixelCopy.request(window, Rect(windowMirrorRect), target.bitmap, { result ->
+                windowMirrorCopying = false
+                if (result == PixelCopy.SUCCESS && needsWindowMirror()) {
+                    target.bounds = dest
+                    windowMirrorPending = windowMirror
+                    windowMirror = target
+                    invalidate()
+                }
+            }, mainHandler)
+        } catch (e: IllegalArgumentException) {
+            // The window has no surface yet (or anymore).
+            windowMirrorCopying = false
+        }
     }
 
     private fun collectSurfaceViews(group: ViewGroup, out: MutableList<SurfaceView>): MutableList<SurfaceView> {
@@ -306,24 +427,48 @@ class BlurView(context: Context) : ReactViewGroup(context) {
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
-        if (cornerRadius > 0f) {
+        if (hasCorners) {
             invalidateOutline()
         }
         updateShaders()
     }
 
     private fun updateOutline() {
-        if (cornerRadius > 0f) {
+        // Uniform corners clip through the outline, which is antialiased.
+        // Other shapes are clipped with cornerPath in draw().
+        if (hasCorners && hasUniformCorners) {
             clipToOutline = true
             outlineProvider = object : ViewOutlineProvider() {
                 override fun getOutline(view: View, outline: Outline) {
-                    outline.setRoundRect(0, 0, view.width, view.height, cornerRadius)
+                    outline.setRoundRect(0, 0, view.width, view.height, cornerRadii[0])
                 }
             }
         } else {
             clipToOutline = false
             outlineProvider = ViewOutlineProvider.BACKGROUND
         }
+    }
+
+    override fun draw(canvas: Canvas) {
+        if (!hasCorners || hasUniformCorners) {
+            super.draw(canvas)
+            return
+        }
+        val saved = canvas.save()
+        canvas.clipPath(cornerPath)
+        super.draw(canvas)
+        canvas.restoreToCount(saved)
+    }
+
+    private fun roundedPath(path: Path, rect: RectF, inset: Float) {
+        path.reset()
+        val radii = FloatArray(8)
+        for (index in 0 until 4) {
+            val r = (cornerRadii[index] - inset).coerceAtLeast(0f)
+            radii[index * 2] = r
+            radii[index * 2 + 1] = r
+        }
+        path.addRoundRect(rect, radii, Path.Direction.CW)
     }
 
     private fun updateShaders() {
@@ -334,6 +479,8 @@ class BlurView(context: Context) : ReactViewGroup(context) {
         drawRect.set(0f, 0f, w, h)
         val halfStroke = rimPaint.strokeWidth * 0.5f
         rimRect.set(halfStroke, halfStroke, w - halfStroke, h - halfStroke)
+        roundedPath(cornerPath, drawRect, 0f)
+        roundedPath(rimPath, rimRect, halfStroke)
 
         val fraction = intensity / 100f
         rimPaint.shader = LinearGradient(
@@ -349,8 +496,7 @@ class BlurView(context: Context) : ReactViewGroup(context) {
     }
 
     private fun resolveMaterial(): Material {
-        val night = resources.configuration.uiMode and
-            Configuration.UI_MODE_NIGHT_MASK == Configuration.UI_MODE_NIGHT_YES
+        val night = nightMode
         return when (tint.lowercase()) {
             "light" -> LEGACY_LIGHT
             "extralight" -> LEGACY_EXTRA_LIGHT
@@ -396,7 +542,10 @@ class BlurView(context: Context) : ReactViewGroup(context) {
     }
 
     private fun applyEffects() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
+            updateFallbackPlate()
+            return
+        }
 
         val fraction = intensity / 100f
         val material = resolveMaterial()
@@ -412,7 +561,22 @@ class BlurView(context: Context) : ReactViewGroup(context) {
         }
         blurEffect = effect
         syncSurfaceMirrors()
+        syncWindowMirror()
         applyChildEffects()
+    }
+
+    // Android 11 and below have no RenderEffect. Draw an opaque-enough plate
+    // in the material's colour so content on top stays readable.
+    private fun updateFallbackPlate() {
+        val fraction = intensity / 100f
+        val material = resolveMaterial()
+        val light = material.luminanceValues.average() > 0.5
+        val alpha = ((0.7f + 0.25f * material.luminanceAmount) * fraction).coerceIn(0f, 1f)
+        fallbackPaint.color = if (light) {
+            Color.argb((alpha * 255).toInt(), 245, 245, 247)
+        } else {
+            Color.argb((alpha * 255).toInt(), 28, 28, 30)
+        }
     }
 
     private fun applyChildEffects() {
@@ -433,13 +597,16 @@ class BlurView(context: Context) : ReactViewGroup(context) {
         }
 
         if (intensity > 0f) {
-            canvas.drawRoundRect(rimRect, cornerRadius, cornerRadius, rimPaint)
+            canvas.drawPath(rimPath, rimPaint)
         }
     }
 
     private fun drawTint(canvas: Canvas) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S && Color.alpha(fallbackPaint.color) > 0) {
+            canvas.drawPath(cornerPath, fallbackPaint)
+        }
         if (Color.alpha(tintPaint.color) > 0) {
-            canvas.drawRoundRect(drawRect, cornerRadius, cornerRadius, tintPaint)
+            canvas.drawPath(cornerPath, tintPaint)
         }
     }
 
@@ -447,7 +614,14 @@ class BlurView(context: Context) : ReactViewGroup(context) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return
         val effect = blurEffect ?: return
         if (!canvas.isHardwareAccelerated || width <= 0 || height <= 0) return
-        val node = backdropNode ?: RenderNode("blurBackdrop").also { backdropNode = it }
+        // Android 12 (API 31-32) keeps the blurred layer of a reused RenderNode
+        // when only its display list changes, so the backdrop froze while
+        // scrolling. Use a fresh node per frame there.
+        val node = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            backdropNode ?: RenderNode("blurBackdrop").also { backdropNode = it }
+        } else {
+            RenderNode("blurBackdrop")
+        }
         node.setPosition(0, 0, width, height)
         val recording = node.beginRecording(width, height)
         try {
@@ -464,6 +638,7 @@ class BlurView(context: Context) : ReactViewGroup(context) {
         var parent = child.parent as? ViewGroup
         var offsetX = 0f
         var offsetY = 0f
+        windowMirror?.draw(canvas)
         val levels = ArrayList<Triple<ViewGroup, Int, FloatArray>>()
         while (parent != null) {
             offsetX += child.left + child.translationX - parent.scrollX
@@ -493,19 +668,6 @@ class BlurView(context: Context) : ReactViewGroup(context) {
                 canvas.restoreToCount(saved)
             }
         }
-    }
-
-    private fun parseColor(colorStr: String): Int {
-        val trimmed = colorStr.trim()
-        if (trimmed.startsWith("rgba", ignoreCase = true) || trimmed.startsWith("rgb", ignoreCase = true)) {
-            val parts = trimmed.substringAfter("(").substringBefore(")").split(",")
-            val r = parts[0].trim().toInt()
-            val g = parts[1].trim().toInt()
-            val b = parts[2].trim().toInt()
-            val a = if (parts.size == 4) (parts[3].trim().toFloat() * 255).toInt() else 255
-            return Color.argb(a, r, g, b)
-        }
-        return Color.parseColor(trimmed)
     }
 }
 
