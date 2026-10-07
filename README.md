@@ -11,6 +11,8 @@ Blur what is behind headers, tab bars, cards, popups and buttons while their con
 [![license](https://img.shields.io/npm/l/@nguyenduy1412/react-native-blur.svg?style=flat-square)](./LICENSE)
 ![platforms](https://img.shields.io/badge/platforms-iOS%20%7C%20Android%20%7C%20Web-blue?style=flat-square)
 
+**[Documentation](https://nguyenduy1412.github.io/react-native-blur/)** · [Guides](https://nguyenduy1412.github.io/react-native-blur/#guides) · [Changelog](./CHANGELOG.md) · [npm](https://www.npmjs.com/package/@nguyenduy1412/react-native-blur)
+
 <img src="https://raw.githubusercontent.com/nguyenduy1412/react-native-blur/main/.github/assets/backdrop-demo.webp" width="760" alt="Backdrop blur on iOS and Android: a frosted button over a playing video, a frosted popup over a map, and a frosted sticky header over a scrolling list" />
 
 <sub>Backdrop mode, recorded on the iOS simulator (left) and an Android emulator (right). The button blurs the video under it, the popup blurs the map, and the header blurs the list scrolling beneath it.</sub>
@@ -225,6 +227,8 @@ The same screen, four ways. Android and iOS from this library land on the same b
 | **Backdrop Overlays (Headers, Tab Bars, Popups)** | ✅ Yes (`mode="backdrop"`) | ⚠️ Limited / Tint only | ⚠️ Platform discrepancies |
 | **iOS Material Match on Android** | ✅ Color-calibrated (1.95/255 error) | ❌ Flat grey tint | ❌ Flat grey tint |
 | **Works with RN CLI & Expo Dev Client** | ✅ No Expo packages required | ⚠️ Primarily Expo | ⚠️ Complex autolinking |
+
+📖 **Guides:** [frosted header and tab bar](https://nguyenduy1412.github.io/react-native-blur/frosted-glass-header-tab-bar/) · [blur video on Android](https://nguyenduy1412.github.io/react-native-blur/android-video-blur/) · [blurred modal background](https://nguyenduy1412.github.io/react-native-blur/blur-modal-background/) · [expo-blur alternative](https://nguyenduy1412.github.io/react-native-blur/expo-blur-alternative/)
 
 📖 **Deep dive with video:** [Kaizer Blur: real blur, even over video](https://kaizer-app.vercel.app) (see the *Library* section).
 

@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Blur a playing video in React Native on Android (expo-video, react-native-video)</title>
+<meta name="description" content="Why expo-blur and @react-native-community/blur leave video sharp on Android, and how to blur expo-video or react-native-video SurfaceView playback in React Native." />
+<meta name="keywords" content="react-native, react-native-blur, blur, blur-view, blurview, react-native-blur-view, expo, expo-blur, expo-blur-alternative, react-native-community-blur, backdrop-blur, frosted-glass, glassmorphism, liquid-glass, video-blur, visual-effect, uivisualeffectview, rendereffect, ios, android, backdrop, backdrop-filter, blur-background, frosted-glass-effect, glass-effect, sticky-header, tab-bar, react-native-cli, fabric, new-architecture" />
+<meta name="robots" content="index,follow,max-image-preview:large" />
+<link rel="canonical" href="https://nguyenduy1412.github.io/react-native-blur/android-video-blur/" />
+<link rel="alternate" type="text/plain" title="llms.txt" href="https://nguyenduy1412.github.io/react-native-blur/llms.txt" />
+<meta name="theme-color" content="#0b0d12" />
+<meta property="og:type" content="article" />
+<meta property="og:site_name" content="React Native Blur" />
+<meta property="og:title" content="Blur a playing video in React Native on Android (expo-video, react-native-video)" />
+<meta property="og:description" content="Why expo-blur and @react-native-community/blur leave video sharp on Android, and how to blur expo-video or react-native-video SurfaceView playback in React Native." />
+<meta property="og:url" content="https://nguyenduy1412.github.io/react-native-blur/android-video-blur/" />
+<meta property="og:image" content="https://nguyenduy1412.github.io/react-native-blur/og.png" />
+<meta property="og:image:width" content="1280" />
+<meta property="og:image:height" content="640" />
+<meta property="og:image:alt" content="React Native Blur: frosted glass for iOS and Android" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="Blur a playing video in React Native on Android (expo-video, react-native-video)" />
+<meta name="twitter:description" content="Why expo-blur and @react-native-community/blur leave video sharp on Android, and how to blur expo-video or react-native-video SurfaceView playback in React Native." />
+<meta name="twitter:image" content="https://nguyenduy1412.github.io/react-native-blur/og.png" />
+<script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"SoftwareSourceCode","@id":"https://nguyenduy1412.github.io/react-native-blur/#software","name":"@nguyenduy1412/react-native-blur","alternateName":"React Native Blur","description":"React Native blur view for React Native CLI and Expo: backdrop blur and frosted glass for headers, tab bars, cards and popups, plus content and video blur. Native iOS materials and Android RenderEffect matched to iOS.","codeRepository":"https://github.com/nguyenduy1412/react-native-blur","programmingLanguage":["TypeScript","Swift","Kotlin","Objective-C++"],"runtimePlatform":["React Native","Expo","iOS","Android","Web"],"license":"https://opensource.org/licenses/MIT","version":"2.0.3","keywords":"react-native, react-native-blur, blur, blur-view, blurview, react-native-blur-view, expo, expo-blur, expo-blur-alternative, react-native-community-blur, backdrop-blur, frosted-glass, glassmorphism, liquid-glass, video-blur, visual-effect, uivisualeffectview, rendereffect, ios, android, backdrop, backdrop-filter, blur-background, frosted-glass-effect, glass-effect, sticky-header, tab-bar, react-native-cli, fabric, new-architecture","url":"https://nguyenduy1412.github.io/react-native-blur/","sameAs":["https://github.com/nguyenduy1412/react-native-blur","https://www.npmjs.com/package/@nguyenduy1412/react-native-blur"],"author":{"@type":"Person","name":"nguyenduy1412","url":"https://github.com/nguyenduy1412"}},{"@type":"TechArticle","headline":"Blur a playing video in React Native on Android (expo-video, react-native-video)","description":"Why expo-blur and @react-native-community/blur leave video sharp on Android, and how to blur expo-video or react-native-video SurfaceView playback in React Native.","url":"https://nguyenduy1412.github.io/react-native-blur/android-video-blur/","dateModified":"2026-10-07","inLanguage":"en","about":{"@id":"https://nguyenduy1412.github.io/react-native-blur/#software"},"author":{"@type":"Person","name":"nguyenduy1412","url":"https://github.com/nguyenduy1412"}},{"@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Why doesn't expo-blur blur my video on Android?","acceptedAnswer":{"@type":"Answer","text":"Android video plays in a SurfaceView, which the system composites outside the app's view tree. View-based blurs never see it. This library copies SurfaceView frames with PixelCopy and blurs the copy."}},{"@type":"Question","name":"Does it work with react-native-video?","acceptedAnswer":{"@type":"Answer","text":"Yes. Wrap the Video in a BlurView for content mode. For backdrop mode over the video, render it into a TextureView (viewType={ViewType.TEXTURE})."}},{"@type":"Question","name":"Does it work in Expo Go?","acceptedAnswer":{"@type":"Answer","text":"No. The package contains native code, so it needs a development build (npx expo run:ios / npx expo run:android) or EAS Build. React Native CLI apps work after pod install and a rebuild."}},{"@type":"Question","name":"Does it work without Expo?","acceptedAnswer":{"@type":"Answer","text":"Yes. Since 2.0 it is a plain React Native Fabric component, so a React Native CLI app only needs npm install and pod install."}},{"@type":"Question","name":"Which Android versions get a real blur?","acceptedAnswer":{"@type":"Answer","text":"Android 12 (API 31) and later, where RenderEffect exists. Android 11 and earlier render the tint and glass rim without blur."}}]},{"@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"React Native Blur","item":"https://nguyenduy1412.github.io/react-native-blur/"},{"@type":"ListItem","position":2,"name":"Android video blur","item":"https://nguyenduy1412.github.io/react-native-blur/android-video-blur/"}]}]}</script>
+<style>:root{--bg:#fbfbfd;--fg:#1d1d1f;--muted:#5f6368;--line:#e3e4e8;--card:#fff;--code:#f2f3f5;--accent:#0a66d8}
+@media (prefers-color-scheme:dark){:root{--bg:#0b0d12;--fg:#e8eaed;--muted:#9aa0a6;--line:#262a33;--card:#12151c;--code:#161a22;--accent:#6aa8ff}}
+*{box-sizing:border-box}html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+a{color:var(--accent)}
+header.top{border-bottom:1px solid var(--line);background:var(--card)}
+header.top .in,main,footer .in{max-width:880px;margin:0 auto;padding:0 16px}
+header.top .in{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center;min-height:56px}
+header.top .brand{font-weight:700;color:var(--fg);text-decoration:none;margin-right:auto}
+header.top nav a{color:var(--muted);text-decoration:none;font-size:14px}header.top nav{display:flex;flex-wrap:wrap;gap:6px 16px}
+header.top nav a[aria-current]{color:var(--fg);font-weight:600}
+main{padding-top:32px;padding-bottom:48px}
+h1{font-size:clamp(28px,5vw,40px);line-height:1.15;margin:0 0 12px}
+.lede{font-size:18px;color:var(--muted);margin:0 0 20px}
+.cta{display:flex;flex-wrap:wrap;gap:10px;margin:0 0 28px}.cta a{padding:8px 14px;border:1px solid var(--line);border-radius:8px;text-decoration:none;background:var(--card);font-size:14px}
+h2{font-size:24px;margin:40px 0 12px;padding-top:8px;border-top:1px solid var(--line)}h3{font-size:18px;margin:24px 0 8px}
+pre{background:var(--code);border:1px solid var(--line);border-radius:8px;padding:14px;overflow-x:auto;font-size:13.5px;line-height:1.5}
+code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.92em}p code,li code,td code{background:var(--code);padding:1px 5px;border-radius:4px}
+table{width:100%;border-collapse:collapse;font-size:14px;display:block;overflow-x:auto}th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}th{white-space:nowrap}
+figure{margin:24px 0}figure img{width:100%;height:auto;border-radius:10px;border:1px solid var(--line)}figcaption{font-size:13px;color:var(--muted);margin-top:6px}
+.cards{list-style:none;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+.cards a{display:block;height:100%;padding:14px;border:1px solid var(--line);border-radius:10px;background:var(--card);text-decoration:none;color:var(--fg)}.cards span{display:block;color:var(--muted);font-size:14px;margin-top:4px}
+details{border:1px solid var(--line);border-radius:8px;padding:10px 14px;margin:8px 0;background:var(--card)}summary{cursor:pointer;font-weight:600}
+footer{border-top:1px solid var(--line);color:var(--muted);font-size:14px}footer .in{padding-top:20px;padding-bottom:28px}</style>
+</head>
+<body>
+<header class="top"><div class="in"><a class="brand" href="../">React Native Blur</a><nav aria-label="Guides"><a href="../">Overview</a><a href="../frosted-glass-header-tab-bar/">Header and tab bar</a><a href="../android-video-blur/" aria-current="page">Android video blur</a><a href="../blur-modal-background/">Modal background</a><a href="../expo-blur-alternative/">vs expo-blur</a></nav></div></header>
+<main>
+<h1>Blur a playing video in React Native on Android</h1>
+<p class="lede">On Android, most blur libraries leave a playing video perfectly sharp behind the glass. This page explains why, and how to blur expo-video and react-native-video.</p>
+<p class="cta"><a href="https://github.com/nguyenduy1412/react-native-blur">GitHub</a><a href="https://www.npmjs.com/package/@nguyenduy1412/react-native-blur">npm</a><a href="https://github.com/nguyenduy1412/react-native-blur/blob/main/CHANGELOG.md">Changelog</a><a href="../llms.txt">llms.txt</a></p>
+
+<figure>
+  <img src="https://raw.githubusercontent.com/nguyenduy1412/react-native-blur/main/.github/assets/video-comparison.webp" loading="lazy" width="1100" height="1212" alt="Left: this library blurs the playing video. Right: a typical blur library lets the video show through sharp." />
+  <figcaption>Left: this library. Right: a typical React Native blur library, with blur on but the video still sharp.</figcaption>
+</figure>
+
+<h2>Why the video stays sharp</h2>
+<p>Android players such as <code>expo-video</code> and <code>react-native-video</code> draw frames into a <code>SurfaceView</code>. The system compositor puts a <code>SurfaceView</code> in its own layer, outside your app's view tree. A blur that captures or renders the view tree never sees that layer, so the video shows through untouched.</p>
+
+<h2>How this library blurs it</h2>
+<p><code>BlurView</code> finds <code>SurfaceView</code>s among its children, copies their frames with <code>PixelCopy</code> (downscaled 4×, about 30 fps) and draws the copy in their place. The <code>RenderEffect</code> blur then applies to the video like everything else.</p>
+
+<h2>Install</h2>
+<h3>React Native CLI</h3>
+<pre><code class="language-sh">npm install @nguyenduy1412/react-native-blur
+cd ios &amp;&amp; pod install</code></pre>
+<p>Rebuild the app. Autolinking picks the library up; no Expo packages are needed.</p>
+<h3>Expo</h3>
+<pre><code class="language-sh">npx expo install @nguyenduy1412/react-native-blur
+npx expo run:ios
+npx expo run:android</code></pre>
+<p>It contains native code, so it does not run in Expo Go. Use a development build or EAS Build.</p>
+
+<h2>Blur a whole video (content mode)</h2>
+<pre><code class="language-tsx">import BlurView from &quot;@nguyenduy1412/react-native-blur&quot;;
+import { useVideoPlayer, VideoView } from &quot;expo-video&quot;;
+
+export function BlurredVideo({ source, locked }) {
+  const player = useVideoPlayer(source, (p) =&gt; p.play());
+  return (
+    &lt;BlurView style={{ flex: 1 }} intensity={locked ? 60 : 0}&gt;
+      &lt;VideoView player={player} style={{ flex: 1 }} /&gt;
+    &lt;/BlurView&gt;
+  );
+}</code></pre>
+<p>Content mode works with the default <code>SurfaceView</code>. Set <code>intensity</code> to <code>0</code> to remove the blur without unmounting the player.</p>
+
+<h2>Frosted button over a video (backdrop mode)</h2>
+<p>To blur only the area under a button and keep the rest of the video sharp, use backdrop mode and render the video into a <code>TextureView</code> on Android:</p>
+<pre><code class="language-tsx">&lt;View style={{ flex: 1 }}&gt;
+  &lt;VideoView player={player} surfaceType=&quot;textureView&quot; style={StyleSheet.absoluteFill} /&gt;
+
+  &lt;BlurView mode=&quot;backdrop&quot; intensity={85} tint=&quot;dark&quot; style={{ borderRadius: 999, paddingVertical: 12, alignItems: &quot;center&quot; }}&gt;
+    &lt;Text style={{ color: &quot;white&quot; }}&gt;Play&lt;/Text&gt;
+  &lt;/BlurView&gt;
+&lt;/View&gt;</code></pre>
+<p>With <code>react-native-video</code>, render into a <code>TextureView</code> on Android (<code>viewType={ViewType.TEXTURE}</code>, or <code>useTextureView</code> in older versions).</p>
+
+<h2>Limits</h2>
+<ul>
+  <li>Video copies refresh at about 30 fps at quarter resolution. This is invisible once blurred but noticeable at very low <code>intensity</code>.</li>
+  <li>Backdrop mode cannot see a <code>SurfaceView</code> behind it; use a <code>TextureView</code>.</li>
+</ul>
+<h2 id="faq">FAQ</h2>
+<details><summary>Why doesn't expo-blur blur my video on Android?</summary><p>Android video plays in a SurfaceView, which the system composites outside the app's view tree. View-based blurs never see it. This library copies SurfaceView frames with PixelCopy and blurs the copy.</p></details>
+<details><summary>Does it work with react-native-video?</summary><p>Yes. Wrap the Video in a BlurView for content mode. For backdrop mode over the video, render it into a TextureView (<code>viewType={ViewType.TEXTURE}</code>).</p></details>
+<details><summary>Does it work in Expo Go?</summary><p>No. The package contains native code, so it needs a development build (<code>npx expo run:ios</code> / <code>npx expo run:android</code>) or EAS Build. React Native CLI apps work after <code>pod install</code> and a rebuild.</p></details>
+<details><summary>Does it work without Expo?</summary><p>Yes. Since 2.0 it is a plain React Native Fabric component, so a React Native CLI app only needs <code>npm install</code> and <code>pod install</code>.</p></details>
+<details><summary>Which Android versions get a real blur?</summary><p>Android 12 (API 31) and later, where <code>RenderEffect</code> exists. Android 11 and earlier render the tint and glass rim without blur.</p></details>
+</main>
+<footer><div class="in"><code>@nguyenduy1412/react-native-blur</code> v2.0.3 · MIT · <a href="https://github.com/nguyenduy1412/react-native-blur">GitHub</a> · <a href="https://www.npmjs.com/package/@nguyenduy1412/react-native-blur">npm</a> · by <a href="https://kaizer-app.vercel.app">nguyenduy1412</a> · Updated 2026-10-07</div></footer>
+</body>
+</html>

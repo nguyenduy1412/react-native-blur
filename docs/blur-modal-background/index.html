@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Blur the background behind a modal or bottom sheet in React Native</title>
+<meta name="description" content="Blur the screen behind a modal, popup or bottom sheet in React Native and Expo on iOS and Android, with sharp modal content on top." />
+<meta name="keywords" content="react-native, react-native-blur, blur, blur-view, blurview, react-native-blur-view, expo, expo-blur, expo-blur-alternative, react-native-community-blur, backdrop-blur, frosted-glass, glassmorphism, liquid-glass, video-blur, visual-effect, uivisualeffectview, rendereffect, ios, android, backdrop, backdrop-filter, blur-background, frosted-glass-effect, glass-effect, sticky-header, tab-bar, react-native-cli, fabric, new-architecture" />
+<meta name="robots" content="index,follow,max-image-preview:large" />
+<link rel="canonical" href="https://nguyenduy1412.github.io/react-native-blur/blur-modal-background/" />
+<link rel="alternate" type="text/plain" title="llms.txt" href="https://nguyenduy1412.github.io/react-native-blur/llms.txt" />
+<meta name="theme-color" content="#0b0d12" />
+<meta property="og:type" content="article" />
+<meta property="og:site_name" content="React Native Blur" />
+<meta property="og:title" content="Blur the background behind a modal or bottom sheet in React Native" />
+<meta property="og:description" content="Blur the screen behind a modal, popup or bottom sheet in React Native and Expo on iOS and Android, with sharp modal content on top." />
+<meta property="og:url" content="https://nguyenduy1412.github.io/react-native-blur/blur-modal-background/" />
+<meta property="og:image" content="https://nguyenduy1412.github.io/react-native-blur/og.png" />
+<meta property="og:image:width" content="1280" />
+<meta property="og:image:height" content="640" />
+<meta property="og:image:alt" content="React Native Blur: frosted glass for iOS and Android" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="Blur the background behind a modal or bottom sheet in React Native" />
+<meta name="twitter:description" content="Blur the screen behind a modal, popup or bottom sheet in React Native and Expo on iOS and Android, with sharp modal content on top." />
+<meta name="twitter:image" content="https://nguyenduy1412.github.io/react-native-blur/og.png" />
+<script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"SoftwareSourceCode","@id":"https://nguyenduy1412.github.io/react-native-blur/#software","name":"@nguyenduy1412/react-native-blur","alternateName":"React Native Blur","description":"React Native blur view for React Native CLI and Expo: backdrop blur and frosted glass for headers, tab bars, cards and popups, plus content and video blur. Native iOS materials and Android RenderEffect matched to iOS.","codeRepository":"https://github.com/nguyenduy1412/react-native-blur","programmingLanguage":["TypeScript","Swift","Kotlin","Objective-C++"],"runtimePlatform":["React Native","Expo","iOS","Android","Web"],"license":"https://opensource.org/licenses/MIT","version":"2.0.3","keywords":"react-native, react-native-blur, blur, blur-view, blurview, react-native-blur-view, expo, expo-blur, expo-blur-alternative, react-native-community-blur, backdrop-blur, frosted-glass, glassmorphism, liquid-glass, video-blur, visual-effect, uivisualeffectview, rendereffect, ios, android, backdrop, backdrop-filter, blur-background, frosted-glass-effect, glass-effect, sticky-header, tab-bar, react-native-cli, fabric, new-architecture","url":"https://nguyenduy1412.github.io/react-native-blur/","sameAs":["https://github.com/nguyenduy1412/react-native-blur","https://www.npmjs.com/package/@nguyenduy1412/react-native-blur"],"author":{"@type":"Person","name":"nguyenduy1412","url":"https://github.com/nguyenduy1412"}},{"@type":"TechArticle","headline":"Blur the background behind a modal or bottom sheet in React Native","description":"Blur the screen behind a modal, popup or bottom sheet in React Native and Expo on iOS and Android, with sharp modal content on top.","url":"https://nguyenduy1412.github.io/react-native-blur/blur-modal-background/","dateModified":"2026-10-07","inLanguage":"en","about":{"@id":"https://nguyenduy1412.github.io/react-native-blur/#software"},"author":{"@type":"Person","name":"nguyenduy1412","url":"https://github.com/nguyenduy1412"}},{"@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Why doesn't the blur work inside React Native Modal on Android?","acceptedAnswer":{"@type":"Answer","text":"Modal opens a separate window on Android, and backdrop mode can only see its own window. Render the overlay in the same screen or through a portal instead."}},{"@type":"Question","name":"Does it work in Expo Go?","acceptedAnswer":{"@type":"Answer","text":"No. The package contains native code, so it needs a development build (npx expo run:ios / npx expo run:android) or EAS Build. React Native CLI apps work after pod install and a rebuild."}},{"@type":"Question","name":"Does it work without Expo?","acceptedAnswer":{"@type":"Answer","text":"Yes. Since 2.0 it is a plain React Native Fabric component, so a React Native CLI app only needs npm install and pod install."}},{"@type":"Question","name":"Which Android versions get a real blur?","acceptedAnswer":{"@type":"Answer","text":"Android 12 (API 31) and later, where RenderEffect exists. Android 11 and earlier render the tint and glass rim without blur."}}]},{"@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"React Native Blur","item":"https://nguyenduy1412.github.io/react-native-blur/"},{"@type":"ListItem","position":2,"name":"Modal background","item":"https://nguyenduy1412.github.io/react-native-blur/blur-modal-background/"}]}]}</script>
+<style>:root{--bg:#fbfbfd;--fg:#1d1d1f;--muted:#5f6368;--line:#e3e4e8;--card:#fff;--code:#f2f3f5;--accent:#0a66d8}
+@media (prefers-color-scheme:dark){:root{--bg:#0b0d12;--fg:#e8eaed;--muted:#9aa0a6;--line:#262a33;--card:#12151c;--code:#161a22;--accent:#6aa8ff}}
+*{box-sizing:border-box}html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+a{color:var(--accent)}
+header.top{border-bottom:1px solid var(--line);background:var(--card)}
+header.top .in,main,footer .in{max-width:880px;margin:0 auto;padding:0 16px}
+header.top .in{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center;min-height:56px}
+header.top .brand{font-weight:700;color:var(--fg);text-decoration:none;margin-right:auto}
+header.top nav a{color:var(--muted);text-decoration:none;font-size:14px}header.top nav{display:flex;flex-wrap:wrap;gap:6px 16px}
+header.top nav a[aria-current]{color:var(--fg);font-weight:600}
+main{padding-top:32px;padding-bottom:48px}
+h1{font-size:clamp(28px,5vw,40px);line-height:1.15;margin:0 0 12px}
+.lede{font-size:18px;color:var(--muted);margin:0 0 20px}
+.cta{display:flex;flex-wrap:wrap;gap:10px;margin:0 0 28px}.cta a{padding:8px 14px;border:1px solid var(--line);border-radius:8px;text-decoration:none;background:var(--card);font-size:14px}
+h2{font-size:24px;margin:40px 0 12px;padding-top:8px;border-top:1px solid var(--line)}h3{font-size:18px;margin:24px 0 8px}
+pre{background:var(--code);border:1px solid var(--line);border-radius:8px;padding:14px;overflow-x:auto;font-size:13.5px;line-height:1.5}
+code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.92em}p code,li code,td code{background:var(--code);padding:1px 5px;border-radius:4px}
+table{width:100%;border-collapse:collapse;font-size:14px;display:block;overflow-x:auto}th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}th{white-space:nowrap}
+figure{margin:24px 0}figure img{width:100%;height:auto;border-radius:10px;border:1px solid var(--line)}figcaption{font-size:13px;color:var(--muted);margin-top:6px}
+.cards{list-style:none;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+.cards a{display:block;height:100%;padding:14px;border:1px solid var(--line);border-radius:10px;background:var(--card);text-decoration:none;color:var(--fg)}.cards span{display:block;color:var(--muted);font-size:14px;margin-top:4px}
+details{border:1px solid var(--line);border-radius:8px;padding:10px 14px;margin:8px 0;background:var(--card)}summary{cursor:pointer;font-weight:600}
+footer{border-top:1px solid var(--line);color:var(--muted);font-size:14px}footer .in{padding-top:20px;padding-bottom:28px}</style>
+</head>
+<body>
+<header class="top"><div class="in"><a class="brand" href="../">React Native Blur</a><nav aria-label="Guides"><a href="../">Overview</a><a href="../frosted-glass-header-tab-bar/">Header and tab bar</a><a href="../android-video-blur/">Android video blur</a><a href="../blur-modal-background/" aria-current="page">Modal background</a><a href="../expo-blur-alternative/">vs expo-blur</a></nav></div></header>
+<main>
+<h1>Blur the background behind a modal in React Native</h1>
+<p class="lede">Dim and blur the screen behind a modal, popup or bottom sheet while the modal content stays sharp, on both iOS and Android.</p>
+<p class="cta"><a href="https://github.com/nguyenduy1412/react-native-blur">GitHub</a><a href="https://www.npmjs.com/package/@nguyenduy1412/react-native-blur">npm</a><a href="https://github.com/nguyenduy1412/react-native-blur/blob/main/CHANGELOG.md">Changelog</a><a href="../llms.txt">llms.txt</a></p>
+
+<h2>Install</h2>
+<h3>React Native CLI</h3>
+<pre><code class="language-sh">npm install @nguyenduy1412/react-native-blur
+cd ios &amp;&amp; pod install</code></pre>
+<p>Rebuild the app. Autolinking picks the library up; no Expo packages are needed.</p>
+<h3>Expo</h3>
+<pre><code class="language-sh">npx expo install @nguyenduy1412/react-native-blur
+npx expo run:ios
+npx expo run:android</code></pre>
+<p>It contains native code, so it does not run in Expo Go. Use a development build or EAS Build.</p>
+
+<h2>In-screen overlay (iOS and Android)</h2>
+<p>Render the overlay in the same screen, absolutely positioned, and put a backdrop <code>BlurView</code> behind its content:</p>
+<pre><code class="language-tsx">import BlurView from &quot;@nguyenduy1412/react-native-blur&quot;;
+
+&lt;View style={{ flex: 1 }}&gt;
+  &lt;Screen /&gt;
+  {visible &amp;&amp; (
+    &lt;View style={StyleSheet.absoluteFill}&gt;
+      &lt;Pressable style={StyleSheet.absoluteFill} onPress={close}&gt;
+        &lt;BlurView mode=&quot;backdrop&quot; intensity={60} tint=&quot;dark&quot; style={StyleSheet.absoluteFill} /&gt;
+      &lt;/Pressable&gt;
+      &lt;ModalCard /&gt;
+    &lt;/View&gt;
+  )}
+&lt;/View&gt;</code></pre>
+
+<h2>Animate the blur in</h2>
+<p>Keep the <code>BlurView</code> mounted and drive <code>intensity</code>; every value from 0 to 100 is a real blur, not an opacity fade.</p>
+<pre><code class="language-tsx">const [intensity, setIntensity] = useState(0);
+useEffect(() =&gt; setIntensity(visible ? 60 : 0), [visible]);
+
+&lt;BlurView mode=&quot;backdrop&quot; intensity={intensity} style={StyleSheet.absoluteFill} /&gt;</code></pre>
+
+<h2>Bottom sheet backdrop</h2>
+<p>Libraries such as <code>@gorhom/bottom-sheet</code> render in the same window, so a backdrop <code>BlurView</code> works as the sheet's backdrop component:</p>
+<pre><code class="language-tsx">&lt;BottomSheet
+  backdropComponent={({ style }) =&gt; (
+    &lt;BlurView mode=&quot;backdrop&quot; intensity={50} tint=&quot;systemMaterial&quot; style={[style, StyleSheet.absoluteFill]} /&gt;
+  )}
+&gt;
+  {content}
+&lt;/BottomSheet&gt;</code></pre>
+
+<h2>React Native &lt;Modal&gt; on Android</h2>
+<p>React Native's <code>&lt;Modal&gt;</code> opens a separate Android window, and backdrop mode only sees content in its own window. Inside a <code>&lt;Modal&gt;</code> the blur works on iOS but not on Android, so use an in-screen overlay or a portal when you need it on both platforms.</p>
+<h2 id="faq">FAQ</h2>
+<details><summary>Why doesn't the blur work inside React Native Modal on Android?</summary><p>Modal opens a separate window on Android, and backdrop mode can only see its own window. Render the overlay in the same screen or through a portal instead.</p></details>
+<details><summary>Does it work in Expo Go?</summary><p>No. The package contains native code, so it needs a development build (<code>npx expo run:ios</code> / <code>npx expo run:android</code>) or EAS Build. React Native CLI apps work after <code>pod install</code> and a rebuild.</p></details>
+<details><summary>Does it work without Expo?</summary><p>Yes. Since 2.0 it is a plain React Native Fabric component, so a React Native CLI app only needs <code>npm install</code> and <code>pod install</code>.</p></details>
+<details><summary>Which Android versions get a real blur?</summary><p>Android 12 (API 31) and later, where <code>RenderEffect</code> exists. Android 11 and earlier render the tint and glass rim without blur.</p></details>
+</main>
+<footer><div class="in"><code>@nguyenduy1412/react-native-blur</code> v2.0.3 · MIT · <a href="https://github.com/nguyenduy1412/react-native-blur">GitHub</a> · <a href="https://www.npmjs.com/package/@nguyenduy1412/react-native-blur">npm</a> · by <a href="https://kaizer-app.vercel.app">nguyenduy1412</a> · Updated 2026-10-07</div></footer>
+</body>
+</html>

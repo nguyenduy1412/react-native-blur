@@ -11,6 +11,7 @@
     "src",
     "index.tsx",
     "README.md",
+    "CHANGELOG.md",
     "llms.txt",
     "llms-full.txt",
     "android",
@@ -23,7 +24,8 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "prepublishOnly": "npm run build",
-    "post:article": "node scripts/post-to-devto.js"
+    "post:article": "node scripts/post-to-devto.js",
+    "docs": "node scripts/build-docs.mjs"
   },
   "keywords": [
     "react-native",
@@ -34,6 +36,8 @@
     "react-native-blur-view",
     "expo",
     "expo-blur",
+    "expo-blur-alternative",
+    "react-native-community-blur",
     "backdrop-blur",
     "frosted-glass",
     "glassmorphism",
@@ -62,7 +66,7 @@
   "bugs": {
     "url": "https://github.com/nguyenduy1412/react-native-blur/issues"
   },
-  "homepage": "https://kaizer-app.vercel.app",
+  "homepage": "https://nguyenduy1412.github.io/react-native-blur/",
   "author": {
     "name": "nguyenduy1412",
     "url": "https://kaizer-app.vercel.app"
