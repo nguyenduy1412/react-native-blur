@@ -270,24 +270,31 @@ export function BlurredVideo({ source, locked }) {
 <p>Content mode works with the default <code>SurfaceView</code>. Set <code>intensity</code> to <code>0</code> to remove the blur without unmounting the player.</p>
 
 <h2>Frosted button over a video (backdrop mode)</h2>
-<p>To blur only the area under a button and keep the rest of the video sharp, use backdrop mode and render the video into a <code>TextureView</code> on Android:</p>
+<p>To blur only the area under a button and keep the rest of the video sharp, use backdrop mode. Since 2.1.0 this works with the default <code>SurfaceView</code> of <code>expo-video</code> and <code>react-native-video</code> on Android; the blur stays in sync with the video (<code>syncVideo</code>, default <code>true</code>).</p>
 ${code(`<View style={{ flex: 1 }}>
-  <VideoView player={player} surfaceType="textureView" style={StyleSheet.absoluteFill} />
+  <VideoView player={player} style={StyleSheet.absoluteFill} />
 
   <BlurView mode="backdrop" intensity={85} tint="dark" style={{ borderRadius: 999, paddingVertical: 12, alignItems: "center" }}>
     <Text style={{ color: "white" }}>Play</Text>
   </BlurView>
 </View>`)}
-<p>With <code>react-native-video</code>, render into a <code>TextureView</code> on Android (<code>viewType={ViewType.TEXTURE}</code>, or <code>useTextureView</code> in older versions).</p>
+<p>With <code>react-native-video</code> it is the same; no <code>TextureView</code> needed:</p>
+${code(`<View style={{ flex: 1 }}>
+  <Video source={{ uri }} style={StyleSheet.absoluteFill} resizeMode="cover" repeat />
+
+  <BlurView mode="backdrop" intensity={85} tint="dark" style={{ borderRadius: 999, paddingVertical: 12, alignItems: "center" }}>
+    <Text style={{ color: "white" }}>Play</Text>
+  </BlurView>
+</View>`)}
 
 <h2>Limits</h2>
 <ul>
-  <li>Video copies are made every frame at quarter resolution. The blurred video trails the real one by one or two frames.</li>
-  <li>Backdrop mode copies a <code>SurfaceView</code> behind it with <code>PixelCopy</code>; a <code>TextureView</code> is drawn directly.</li>
+  <li>Backdrop mode copies a <code>SurfaceView</code> behind it with <code>PixelCopy</code>, off the UI thread; a <code>TextureView</code> is drawn directly. With <code>syncVideo</code> on, a 60 fps video is shown at the copy rate; use <code>syncVideo={false}</code> or a <code>TextureView</code> player to keep it at full rate.</li>
+  <li>Copies stop while the video is paused or the BlurView is off screen.</li>
 </ul>`,
     faq: [
       ["Why doesn't expo-blur blur my video on Android?", "Android video plays in a SurfaceView, which the system composites outside the app's view tree. View-based blurs never see it. This library copies SurfaceView frames with PixelCopy and blurs the copy."],
-      ["Does it work with react-native-video?", "Yes. Wrap the Video in a BlurView for content mode. For backdrop mode over the video, render it into a TextureView (<code>viewType={ViewType.TEXTURE}</code>)."],
+      ["Does it work with react-native-video?", "Yes. Wrap the Video in a BlurView for content mode. Since 2.1.0 backdrop mode over the video also works with the default SurfaceView, so no TextureView is needed."],
       ...COMMON_FAQ,
     ],
   },

@@ -2,9 +2,9 @@
 
 # React Native Blur
 
-**Backdrop blur and frosted glass for React Native and Expo, on iOS and Android.**
+**Backdrop blur and frosted glass for React Native and Expo, on iOS and Android. Works over `expo-video` and `react-native-video`.**
 
-Blur what is behind headers, tab bars, cards, popups and buttons while their content stays sharp. Blur a whole screen or a playing video. Real iOS materials on iOS, and the same materials rebuilt on Android with `RenderEffect`, matched to iOS colour for colour.
+Blur what is behind headers, tab bars, cards, popups and buttons while their content stays sharp. Blur a whole screen or a playing video, including **`expo-video` and `react-native-video` players on Android**. Real iOS materials on iOS, and the same materials rebuilt on Android with `RenderEffect`, matched to iOS colour for colour.
 
 [![npm version](https://img.shields.io/npm/v/@nguyenduy1412/react-native-blur.svg?style=flat-square)](https://www.npmjs.com/package/@nguyenduy1412/react-native-blur)
 [![npm downloads](https://img.shields.io/npm/dm/@nguyenduy1412/react-native-blur.svg?style=flat-square)](https://www.npmjs.com/package/@nguyenduy1412/react-native-blur)
@@ -21,10 +21,21 @@ Blur what is behind headers, tab bars, cards, popups and buttons while their con
 
 ---
 
+> [!IMPORTANT]
+> ### 🎬 New in 2.1.0: blur over `expo-video` and `react-native-video`
+>
+> Frosted glass now works over a playing video with **[`expo-video`](https://docs.expo.dev/versions/latest/sdk/video/)** (`VideoView`) and **[`react-native-video`](https://github.com/TheWidlarzGroup/react-native-video)** (`<Video>`, `SurfaceView` and `TextureView`) on both iOS and Android.
+>
+> - **Backdrop mode over video**: headers, controls and cards blur the live video behind them, in sync with it (`syncVideo`, default `true`). No need to switch the player to `TextureView`.
+> - **Content mode on video**: blur a whole player, Android 12 included.
+> - **Light**: frame copies run off the UI thread, are shared by every `BlurView` over the same video, and stop while it is paused or off screen.
+>
+> Also new: backdrop inside `<Modal>` on Android, per-corner radii, any `tintColor`, and Reanimated `intensity`. See the [changelog](./CHANGELOG.md).
+
 ## Features
 
 - 🪟 **Backdrop blur** (`mode="backdrop"`): frosted headers, tab bars, cards, popups and buttons that blur whatever is behind them, with sharp content on top. Works over scrolling lists and playing video.
-- 🎬 **Blurs video**, including `SurfaceView` players such as `expo-video` and `react-native-video` on Android.
+- 🎬 **Blurs video from `expo-video` and `react-native-video`**, in both backdrop and content mode, including their `SurfaceView` players on Android (which other blur libraries leave sharp).
 - 🍎 **Real iOS materials.** On iOS it is `UIVisualEffectView` with the system blur styles, not an imitation.
 - 🤖 **Android matched to iOS.** A `RenderEffect` chain (Gaussian blur, then a colour matrix) per material, calibrated against iOS screenshots: mean error **1.95 / 255** across 187 sampled colours.
 - ✨ **Glass edge.** A specular rim highlight gives the "glass has thickness" look.
@@ -131,11 +142,27 @@ import BlurView from "@nguyenduy1412/react-native-blur";
 
 ### Frosted button over a video
 
-Only the button area is blurred and the rest of the video stays sharp. On Android, render the video with a `TextureView` for backdrop mode.
+Only the button area is blurred and the rest of the video stays sharp. Works with the default `SurfaceView` on Android; no `TextureView` needed.
+
+With `expo-video`:
 
 ```tsx
 <View style={{ flex: 1 }}>
-  <VideoView player={player} surfaceType="textureView" style={StyleSheet.absoluteFill} />
+  <VideoView player={player} style={StyleSheet.absoluteFill} />
+
+  <BlurView mode="backdrop" intensity={85} tint="dark" style={{ borderRadius: 999, paddingVertical: 12, alignItems: "center" }}>
+    <Text style={{ color: "white" }}>Play</Text>
+  </BlurView>
+</View>
+```
+
+With `react-native-video`:
+
+```tsx
+import Video from "react-native-video";
+
+<View style={{ flex: 1 }}>
+  <Video source={{ uri }} style={StyleSheet.absoluteFill} resizeMode="cover" repeat />
 
   <BlurView mode="backdrop" intensity={85} tint="dark" style={{ borderRadius: 999, paddingVertical: 12, alignItems: "center" }}>
     <Text style={{ color: "white" }}>Play</Text>
@@ -182,7 +209,7 @@ Keep the content mounted and drive `intensity`. `0` turns the effect off complet
 
 ### Blur a playing video
 
-Content mode picks up `SurfaceView` players automatically.
+Content mode picks up `SurfaceView` players (`expo-video`, `react-native-video`) automatically.
 
 ```tsx
 <BlurView style={{ flex: 1 }} intensity={60}>
