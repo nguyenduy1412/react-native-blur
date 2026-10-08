@@ -21,7 +21,8 @@ All notable changes to `@nguyenduy1412/react-native-blur` are listed here. The p
 - Android: changing `tint`, `blurRadius` or `saturation` in backdrop mode redraws immediately.
 - Android: `#RRGGBBAA` colours were read as `#AARRGGBB`.
 - Android 12 (API 31-32): content mode around a playing video showed black. Hiding the SurfaceView also hid the blurred copy drawn over it, so the SurfaceView stays visible there, and the content is recorded into a fresh `RenderNode` per frame so the blur follows the video.
-- Android: a failed `PixelCopy` request no longer leaves a video copy stuck, and one `SurfaceView` is never copied twice at the same time.
+- Android: the blurred copy of a video trails it by less. Copies start again as soon as the previous one lands (no fixed 30 fps timer), and one copy of a `SurfaceView` is shared by every `BlurView` that blurs it instead of each waiting its turn.
+- Android: a failed `PixelCopy` request no longer leaves a video copy stuck.
 - Android: screens with many backdrop `BlurView`s froze (seconds per frame). Nested backdrop captures no longer re-capture their own backdrop, and only on-screen `BlurView`s re-capture every frame.
 - iOS: `tintColor` values such as `rgba(...)` and named colours were ignored; only `#RRGGBB` worked.
 - iOS: the blur effect is rebuilt when the view re-enters a window or the app returns to the foreground, so `intensity` stays consistent after navigation.

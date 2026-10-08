@@ -145,7 +145,7 @@ Only the button area is blurred and the rest of the video stays sharp. On Androi
 
 ### Popup or card over a map
 
-On Android a map drawn into a `SurfaceView` is copied with `PixelCopy` (about 30 fps) and blurred like the rest of the backdrop.
+On Android a map drawn into a `SurfaceView` is copied with `PixelCopy` every frame and blurred like the rest of the backdrop.
 
 ```tsx
 <View style={{ flex: 1 }}>
@@ -288,7 +288,7 @@ Accepts every `View` prop, plus:
 
 **Android (API 31+).** In content mode the view applies a `RenderEffect` chain to its children: a Gaussian blur, then a `ColorMatrix` that restores the brightness and saturation the blur removes and lays down the material's tint plate. The material numbers come from Apple's own `.materialrecipe` files in the iOS runtime, and `scripts/check-material-recipes.py` checks the Android output against colours sampled from iOS screenshots.
 
-**Video on Android.** A `SurfaceView` is composited by the system, outside the normal view hierarchy, so no `RenderEffect` can reach it. The view finds `SurfaceView`s among its children, copies their frames with `PixelCopy` (downscaled 4×, about 30 fps) and draws the copy in their place, where the blur applies like it does to everything else.
+**Video on Android.** A `SurfaceView` is composited by the system, outside the normal view hierarchy, so no `RenderEffect` can reach it. The view finds `SurfaceView`s among its children, copies their frames with `PixelCopy` (downscaled 4×, every frame) and draws the copy in their place, where the blur applies like it does to everything else.
 
 **Backdrop mode.** On iOS the effect view is placed underneath the children, so `UIVisualEffectView` blurs whatever is behind the `BlurView`. On Android the view records what is drawn behind it (ancestor backgrounds and the sibling views before it, with their scroll offsets and transforms) into a `RenderNode`, applies the same blur and material chain, and draws the children on top. The recording is refreshed on every frame where something on screen changed, so scrolling lists and playing videos stay in sync.
 
@@ -298,10 +298,10 @@ Accepts every `View` prop, plus:
 
 - **Android 11 and below** have no `RenderEffect`, so they draw a translucent plate in the material's colour instead of a blur.
 - **`blurRadius` and `saturation`** are ignored on iOS, which uses the system material as is.
-- **Video copies on Android** refresh at about 30 fps at quarter resolution. That is invisible once blurred, but you will notice it at a very low `intensity`.
+- **Video copies on Android** are made at quarter resolution, as fast as `PixelCopy` returns them (usually the video's own frame rate). The blurred video trails the real one by one or two frames, which you can notice where sharp and blurred video sit side by side.
 - **Colour fidelity:** Android fits each iOS luminance curve with a single colour matrix, so it averages about 2 / 255 off iOS. `systemChromeMaterial` is the outlier, at up to about 23 / 255.
 - **Backdrop inside `<Modal>` on Android** copies the screen behind the modal with `PixelCopy` at about 30 fps and half resolution, then blurs it.
-- **`SurfaceView` behind a backdrop on Android** (video, maps) is copied with `PixelCopy` at about 30 fps and quarter resolution, then blurred.
+- **`SurfaceView` behind a backdrop on Android** (video, maps) is copied with `PixelCopy` every frame at quarter resolution, then blurred.
 
 ## FAQ
 

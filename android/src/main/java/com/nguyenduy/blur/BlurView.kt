@@ -64,7 +64,7 @@ private const val LUMA_G = 0.715f
 private const val LUMA_B = 0.072f
 private const val SKIA_RADIUS_TO_SIGMA = 0.57735f
 private const val SURFACE_MIRROR_DOWNSCALE = 4
-private const val SURFACE_MIRROR_INTERVAL_NANOS = 33_000_000L
+private const val WINDOW_MIRROR_INTERVAL_NANOS = 33_000_000L
 private const val WINDOW_MIRROR_DOWNSCALE = 2
 
 // A PixelCopy copy of a SurfaceView. In content mode it is shown in the
@@ -99,9 +99,11 @@ class BlurView(context: Context) : ReactViewGroup(context) {
         // Depth of backdrop captures in progress on the UI thread.
         var captureDepth = 0
 
-        // SurfaceViews with a PixelCopy in flight, across all BlurViews.
-        // Overlapping copies of one SurfaceView stall its video decoder.
+        // SurfaceViews with a PixelCopy in flight, across all BlurViews. One
+        // copy at a time per SurfaceView; its result is shared with every
+        // BlurView that mirrors the same SurfaceView.
         val copiesInFlight = HashSet<SurfaceView>()
+        val mirrorSubscribers = HashMap<SurfaceView, MutableSet<BlurView>>()
     }
 
     private val density = context.resources.displayMetrics.density
@@ -160,9 +162,11 @@ class BlurView(context: Context) : ReactViewGroup(context) {
     private val mirrorFrameCallback = object : Choreographer.FrameCallback {
         override fun doFrame(frameTimeNanos: Long) {
             if (!mirrorLoopRunning) return
-            if (frameTimeNanos - lastMirrorNanos >= SURFACE_MIRROR_INTERVAL_NANOS) {
+            // Video copies start again as soon as the previous one lands, so
+            // the blurred copy trails the video by as little as possible.
+            surfaceMirrors.values.forEach(::copySurface)
+            if (frameTimeNanos - lastMirrorNanos >= WINDOW_MIRROR_INTERVAL_NANOS) {
                 lastMirrorNanos = frameTimeNanos
-                surfaceMirrors.values.forEach(::copySurface)
                 copyActivityWindow()
             }
             Choreographer.getInstance().postFrameCallback(this)
@@ -329,7 +333,12 @@ class BlurView(context: Context) : ReactViewGroup(context) {
         if (!inOverlay) addSurfaceAncestors(found)
         (surfaceMirrors.keys - found.toSet()).forEach(::releaseMirror)
         surfaceMirrors.values.filter { it.inOverlay != inOverlay }.map { it.view }.forEach(::releaseMirror)
-        found.forEach { surfaceMirrors.getOrPut(it) { SurfaceMirror(it, inOverlay) } }
+        found.forEach { surface ->
+            surfaceMirrors.getOrPut(surface) {
+                mirrorSubscribers.getOrPut(surface) { HashSet() }.add(this)
+                SurfaceMirror(surface, inOverlay)
+            }
+        }
         updateMirrorLoop()
     }
 
@@ -467,7 +476,10 @@ class BlurView(context: Context) : ReactViewGroup(context) {
                 copiesInFlight.remove(view)
                 mirror.copying = false
                 mirror.ready = true
-                if (result == PixelCopy.SUCCESS && surfaceMirrors[view] === mirror) showMirror(mirror, frame)
+                if (result == PixelCopy.SUCCESS && surfaceMirrors[view] === mirror) {
+                    showMirror(mirror, frame)
+                    mirrorSubscribers[view]?.forEach { if (it !== this) it.receiveSharedFrame(view, frame) }
+                }
                 invalidate()
             }, mainHandler)
         } catch (e: IllegalArgumentException) {
@@ -476,6 +488,18 @@ class BlurView(context: Context) : ReactViewGroup(context) {
             mirror.copying = false
             mirror.ready = true
         }
+    }
+
+    // A copy of [view] made by another BlurView.
+    private fun receiveSharedFrame(view: SurfaceView, frame: BitmapDrawable) {
+        val mirror = surfaceMirrors[view] ?: return
+        mirror.ready = true
+        if (mirror.inOverlay) {
+            showMirror(mirror, frame)
+        } else {
+            mirror.shown = frame
+        }
+        invalidate()
     }
 
     private fun mirrorFrameBuffer(mirror: SurfaceMirror, width: Int, height: Int): BitmapDrawable {
@@ -527,6 +551,10 @@ class BlurView(context: Context) : ReactViewGroup(context) {
 
     private fun releaseMirror(view: SurfaceView) {
         val mirror = surfaceMirrors.remove(view) ?: return
+        mirrorSubscribers[view]?.let { subscribers ->
+            subscribers.remove(this)
+            if (subscribers.isEmpty()) mirrorSubscribers.remove(view)
+        }
         if (mirror.inOverlay) mirror.shown?.let { view.overlay.remove(it) }
         mirror.shown = null
         if (!mirror.ownerAlpha.isNaN()) view.alpha = mirror.ownerAlpha

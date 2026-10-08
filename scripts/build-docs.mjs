@@ -140,7 +140,7 @@ ${code(`import BlurView from "${PKG}";
 <h2 id="how-it-works">How it works</h2>
 <p><strong>iOS.</strong> A <code>UIVisualEffectView</code> with the matching <code>UIBlurEffect</code> style sits over the children in content mode and underneath them in backdrop mode. <code>intensity</code> scrubs a paused <code>UIViewPropertyAnimator</code>, so every value is a real system blur rather than an opacity fade.</p>
 <p><strong>Android (API 31+).</strong> A <code>RenderEffect</code> chain applies a Gaussian blur, then a <code>ColorMatrix</code> that restores the brightness and saturation the blur removes and lays down the material's tint. The numbers come from Apple's own material recipes and are checked against colours sampled from iOS screenshots.</p>
-<p><strong>Video on Android.</strong> <code>SurfaceView</code>s inside the view are copied with <code>PixelCopy</code> (downscaled 4×, about 30 fps) and drawn in place, where the blur applies to them like everything else.</p>
+<p><strong>Video on Android.</strong> <code>SurfaceView</code>s inside the view are copied with <code>PixelCopy</code> (downscaled 4×, every frame) and drawn in place, where the blur applies to them like everything else.</p>
 <p><strong>Backdrop on Android.</strong> The view records what is drawn behind it (ancestor backgrounds and earlier siblings, with scroll offsets and transforms) into a <code>RenderNode</code>, blurs it, and draws the children on top. It refreshes on every frame where something changed.</p>
 <p><strong>Web.</strong> CSS <code>backdrop-filter: blur() saturate()</code> with a tint background.</p>
 
@@ -149,7 +149,7 @@ ${code(`import BlurView from "${PKG}";
   <li>Android 11 and below have no <code>RenderEffect</code>, so they draw a translucent material plate instead of a blur.</li>
   <li><code>blurRadius</code> and <code>saturation</code> are ignored on iOS.</li>
   <li>Backdrop inside <code>&lt;Modal&gt;</code> on Android copies the screen behind with <code>PixelCopy</code> at about 30 fps, half resolution.</li>
-  <li>A <code>SurfaceView</code> behind a backdrop on Android (video, maps) is copied with <code>PixelCopy</code> at about 30 fps, quarter resolution.</li>
+  <li>A <code>SurfaceView</code> behind a backdrop on Android (video, maps) is copied with <code>PixelCopy</code> every frame, quarter resolution.</li>
 </ul>`,
     faq: [
       ["How do I make a frosted header, tab bar or button in React Native?", "Use <code>&lt;BlurView mode=\"backdrop\"&gt;</code>. The content behind the view is blurred and its children stay sharp, on both iOS and Android."],
@@ -250,7 +250,7 @@ ${code(`<Tab.Navigator
 <p>Android players such as <code>expo-video</code> and <code>react-native-video</code> draw frames into a <code>SurfaceView</code>. The system compositor puts a <code>SurfaceView</code> in its own layer, outside your app's view tree. A blur that captures or renders the view tree never sees that layer, so the video shows through untouched.</p>
 
 <h2>How this library blurs it</h2>
-<p><code>BlurView</code> finds <code>SurfaceView</code>s among its children, copies their frames with <code>PixelCopy</code> (downscaled 4×, about 30 fps) and draws the copy in their place. The <code>RenderEffect</code> blur then applies to the video like everything else.</p>
+<p><code>BlurView</code> finds <code>SurfaceView</code>s among its children, copies their frames with <code>PixelCopy</code> (downscaled 4×, every frame) and draws the copy in their place. The <code>RenderEffect</code> blur then applies to the video like everything else.</p>
 
 <h2>Install</h2>
 ${INSTALL}
@@ -282,7 +282,7 @@ ${code(`<View style={{ flex: 1 }}>
 
 <h2>Limits</h2>
 <ul>
-  <li>Video copies refresh at about 30 fps at quarter resolution. This is invisible once blurred but noticeable at very low <code>intensity</code>.</li>
+  <li>Video copies are made every frame at quarter resolution. The blurred video trails the real one by one or two frames.</li>
   <li>Backdrop mode copies a <code>SurfaceView</code> behind it with <code>PixelCopy</code>; a <code>TextureView</code> is drawn directly.</li>
 </ul>`,
     faq: [
