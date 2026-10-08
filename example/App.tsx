@@ -125,6 +125,12 @@ export default function App() {
         setVideo6Paused(true);
         setVideo7Paused(false);
       }
+      if (url.includes('play=6')) {
+        setPlayAll(false);
+        setVideo6Paused(false);
+        setVideo7Paused(true);
+        setVideo9Paused(true);
+      }
       if (url.includes('play=9')) {
         setPlayAll(false);
         setVideo6Paused(true);
