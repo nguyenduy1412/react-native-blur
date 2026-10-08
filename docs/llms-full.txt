@@ -119,7 +119,7 @@ Use `mode="backdrop"` with absolute positioning. It blurs the scrolling content 
 
 ### Button over an Android video
 
-For backdrop blur over a video, render the video with a `TextureView`, for example `surfaceType="textureView"` in `expo-video`. Android cannot include a SurfaceView behind a backdrop blur. For blurring the video itself, wrap the player in content-mode `BlurView`; SurfaceView video is supported there.
+Backdrop blur over a video works with both `SurfaceView` and `TextureView` players. On Android a `SurfaceView` behind the BlurView is copied with `PixelCopy` (about 30 fps) and blurred. To blur the video itself, wrap the player in a content-mode `BlurView`.
 
 ### Blur behind a modal
 

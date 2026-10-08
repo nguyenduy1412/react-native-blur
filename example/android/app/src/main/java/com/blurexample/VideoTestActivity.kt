@@ -18,6 +18,8 @@ import android.widget.TextView
 import android.widget.VideoView
 import com.nguyenduy.blur.BlurView
 import java.io.File
+import java.io.FileInputStream
+import java.io.FileOutputStream
 
 class VideoTestActivity : Activity() {
 
@@ -28,15 +30,26 @@ class VideoTestActivity : Activity() {
     private var contentBlurView: BlurView? = null
 
     private fun getVideoUri(): Uri {
+        // Try local raw resource first
         val rawResId = resources.getIdentifier("sample", "raw", packageName)
-        if (rawResId != 0) {
-            return Uri.parse("android.resource://$packageName/$rawResId")
+        if (rawResId != 0) return Uri.parse("android.resource://$packageName/$rawResId")
+        // Copy from sdcard into app cache (no external-storage permission needed on API 29+)
+        val cached = File(cacheDir, "sample.mp4")
+        if (!cached.exists()) {
+            val sdFile = File("/sdcard/sample.mp4")
+            if (sdFile.exists()) {
+                try {
+                    FileInputStream(sdFile).use { input ->
+                        FileOutputStream(cached).use { output -> input.copyTo(output) }
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "copy sdcard->cache failed", e)
+                }
+            }
         }
-        val sdFile = File("/sdcard/sample.mp4")
-        if (sdFile.exists()) {
-            return Uri.fromFile(sdFile)
-        }
-        return Uri.parse("android.resource://$packageName/raw/sample")
+        if (cached.exists()) return Uri.fromFile(cached)
+        // Last resort: stream from Google CDN
+        return Uri.parse("https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4")
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -242,7 +255,7 @@ class VideoTestActivity : Activity() {
         // SECTION 3: Backdrop Mode over SurfaceView (Safety Fallback)
         // ==========================================
         val section3Title = TextView(this).apply {
-            text = "3. Backdrop Mode over SurfaceView (Skipped Safely)"
+            text = "3. Backdrop Mode over SurfaceView & TextView (20% Blur)"
             textSize = 16f
             setTextColor(Color.parseColor("#4dabf7"))
             setTypeface(null, android.graphics.Typeface.BOLD)
@@ -253,7 +266,7 @@ class VideoTestActivity : Activity() {
         val frame3 = FrameLayout(this).apply {
             setBackgroundColor(Color.parseColor("#1e1e1e"))
         }
-        container.addView(frame3, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(160)))
+        container.addView(frame3, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(180)))
 
         val surfaceVideo3 = VideoView(this).apply {
             setVideoURI(getVideoUri())
@@ -265,23 +278,37 @@ class VideoTestActivity : Activity() {
         videoViews.add(surfaceVideo3)
         frame3.addView(surfaceVideo3, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
 
+        val siblingText3 = TextView(this).apply {
+            text = "SURFACEVIEW + TEXTVIEW SIBLING"
+            setTextColor(Color.parseColor("#ffcc00"))
+            textSize = 12f
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            setBackgroundColor(Color.parseColor("#99000000"))
+            setPadding(dp(8), dp(4), dp(8), dp(4))
+        }
+        frame3.addView(siblingText3, FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+            gravity = Gravity.TOP or Gravity.START
+            setMargins(dp(12), dp(12), 0, 0)
+        })
+
         val backdropSurfaceCard = BlurView(this).apply {
             setMode("backdrop")
-            setIntensity(60.0)
+            setIntensity(20.0)
             setTint("dark")
-            setTintColor(Color.parseColor("#60000000"))
+            setTintColor(Color.parseColor("#40000000"))
             setCornerRadii(listOf(16.0, 16.0, 16.0, 16.0))
         }
-        val backdropSurfaceLp = FrameLayout.LayoutParams(dp(200), dp(100)).apply {
+        val backdropSurfaceLp = FrameLayout.LayoutParams(dp(220), dp(110)).apply {
             gravity = Gravity.CENTER
         }
         frame3.addView(backdropSurfaceCard, backdropSurfaceLp)
 
         val backdropSurfaceText = TextView(this).apply {
-            text = "SurfaceView sibling skipped\n(Tint overlay shown, no crash)"
+            text = "Backdrop 20% Blur\nOver SurfaceView + TextView\n(PixelCopy mirror)"
             setTextColor(Color.WHITE)
             gravity = Gravity.CENTER
-            textSize = 11f
+            textSize = 12f
+            setTypeface(null, android.graphics.Typeface.BOLD)
         }
         backdropSurfaceCard.blurContent.addView(backdropSurfaceText, ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
 

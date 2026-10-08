@@ -145,7 +145,7 @@ Only the button area is blurred and the rest of the video stays sharp. On Androi
 
 ### Popup or card over a map
 
-On Android the map must render into a regular view or a `TextureView`; a map drawn into a `SurfaceView` is invisible to backdrop mode.
+On Android a map drawn into a `SurfaceView` is copied with `PixelCopy` (about 30 fps) and blurred like the rest of the backdrop.
 
 ```tsx
 <View style={{ flex: 1 }}>
@@ -301,7 +301,7 @@ Accepts every `View` prop, plus:
 - **Video copies on Android** refresh at about 30 fps at quarter resolution. That is invisible once blurred, but you will notice it at a very low `intensity`.
 - **Colour fidelity:** Android fits each iOS luminance curve with a single colour matrix, so it averages about 2 / 255 off iOS. `systemChromeMaterial` is the outlier, at up to about 23 / 255.
 - **Backdrop inside `<Modal>` on Android** copies the screen behind the modal with `PixelCopy` at about 30 fps and half resolution, then blurs it.
-- **Backdrop mode on Android cannot see a `SurfaceView` behind it.** Render the video with a `TextureView` instead, for example `<VideoView surfaceType="textureView" />` in expo-video. Content mode blurs `SurfaceView` video fine.
+- **`SurfaceView` behind a backdrop on Android** (video, maps) is copied with `PixelCopy` at about 30 fps and quarter resolution, then blurred.
 
 ## FAQ
 

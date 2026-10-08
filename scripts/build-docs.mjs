@@ -149,7 +149,7 @@ ${code(`import BlurView from "${PKG}";
   <li>Android 11 and below have no <code>RenderEffect</code>, so they draw a translucent material plate instead of a blur.</li>
   <li><code>blurRadius</code> and <code>saturation</code> are ignored on iOS.</li>
   <li>Backdrop inside <code>&lt;Modal&gt;</code> on Android copies the screen behind with <code>PixelCopy</code> at about 30 fps, half resolution.</li>
-  <li>Backdrop mode on Android cannot see a <code>SurfaceView</code> behind it. Use a <code>TextureView</code> video (<code>surfaceType="textureView"</code> in expo-video). Content mode blurs <code>SurfaceView</code> video fine.</li>
+  <li>A <code>SurfaceView</code> behind a backdrop on Android (video, maps) is copied with <code>PixelCopy</code> at about 30 fps, quarter resolution.</li>
 </ul>`,
     faq: [
       ["How do I make a frosted header, tab bar or button in React Native?", "Use <code>&lt;BlurView mode=\"backdrop\"&gt;</code>. The content behind the view is blurred and its children stay sharp, on both iOS and Android."],
@@ -283,7 +283,7 @@ ${code(`<View style={{ flex: 1 }}>
 <h2>Limits</h2>
 <ul>
   <li>Video copies refresh at about 30 fps at quarter resolution. This is invisible once blurred but noticeable at very low <code>intensity</code>.</li>
-  <li>Backdrop mode cannot see a <code>SurfaceView</code> behind it; use a <code>TextureView</code>.</li>
+  <li>Backdrop mode copies a <code>SurfaceView</code> behind it with <code>PixelCopy</code>; a <code>TextureView</code> is drawn directly.</li>
 </ul>`,
     faq: [
       ["Why doesn't expo-blur blur my video on Android?", "Android video plays in a SurfaceView, which the system composites outside the app's view tree. View-based blurs never see it. This library copies SurfaceView frames with PixelCopy and blurs the copy."],

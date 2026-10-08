@@ -68,7 +68,7 @@ Blur a playing video:
 - Requires React Native 0.76+ with the New Architecture (Fabric component). Tested with React Native 0.86 in a plain React Native CLI app and in Expo SDK 57.
 - blurRadius and saturation are ignored on iOS.
 - Android video frames are copied at about 30 fps, quarter resolution, before blurring (content mode).
-- Backdrop mode works inside React Native <Modal transparent> on iOS and Android (Android copies the screen behind with PixelCopy). On Android it cannot see a SurfaceView behind it; use a TextureView video (expo-video surfaceType="textureView").
+- Backdrop mode works inside React Native <Modal transparent> on iOS and Android (Android copies the screen behind with PixelCopy). On Android a SurfaceView behind the backdrop (video, maps) is copied with PixelCopy and blurred too.
 - `intensity` can be animated with Reanimated: `Animated.createAnimatedComponent(BlurView)` plus `useAnimatedProps`.
 
 ## Links

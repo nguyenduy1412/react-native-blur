@@ -11,6 +11,8 @@ All notable changes to `@nguyenduy1412/react-native-blur` are listed here. The p
 - `tintColor` accepts any React Native colour (`ColorValue`): `rgba()`, `#RRGGBBAA`, named colours and `PlatformColor`.
 - `BlurView` forwards its ref to the native view, so `intensity` can be animated with Reanimated (`Animated.createAnimatedComponent` + `useAnimatedProps`) on the UI thread.
 - Android 11 and below draw a translucent plate in the material's colour instead of an almost invisible overlay.
+- Android: backdrop mode blurs a `SurfaceView` behind it (video players such as `react-native-video` and `expo-video`, maps). Its frames are copied with `PixelCopy` while it is on screen.
+- Android: `BlurView` can be used from native code (non-exact measure specs no longer throw; native children fill the view).
 
 ### Bug fixes
 
@@ -18,6 +20,8 @@ All notable changes to `@nguyenduy1412/react-native-blur` are listed here. The p
 - Android: materials now follow `Appearance.setColorScheme` overrides and light/dark switches while the app is running.
 - Android: changing `tint`, `blurRadius` or `saturation` in backdrop mode redraws immediately.
 - Android: `#RRGGBBAA` colours were read as `#AARRGGBB`.
+- Android 12 (API 31-32): content mode around a playing video showed black. The SurfaceView copy is now drawn directly, and the content is recorded into a fresh `RenderNode` per frame.
+- Android: screens with many backdrop `BlurView`s froze (seconds per frame). Nested backdrop captures no longer re-capture their own backdrop, and only on-screen `BlurView`s re-capture every frame.
 - iOS: `tintColor` values such as `rgba(...)` and named colours were ignored; only `#RRGGBB` worked.
 - iOS: the blur effect is rebuilt when the view re-enters a window or the app returns to the foreground, so `intensity` stays consistent after navigation.
 - iOS: the glass rim is hidden at `intensity={0}`.

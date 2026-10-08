@@ -20,7 +20,6 @@
     "Use intensity 0 to disable the blur instead of unmounting the BlurView.",
     "The package contains native code and does not run in Expo Go; use a development build or EAS Build.",
     "Backdrop mode works inside <Modal transparent>; keep the modal root view transparent.",
-    "On Android, backdrop mode cannot see a SurfaceView behind it; render video into a TextureView.",
     "blurRadius and saturation only affect Android and Web."
   ]
 }

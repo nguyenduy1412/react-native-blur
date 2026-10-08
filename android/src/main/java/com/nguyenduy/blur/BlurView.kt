@@ -67,7 +67,10 @@ private const val SURFACE_MIRROR_DOWNSCALE = 4
 private const val SURFACE_MIRROR_INTERVAL_NANOS = 33_000_000L
 private const val WINDOW_MIRROR_DOWNSCALE = 2
 
-private class SurfaceMirror(val view: SurfaceView, val useOverlay: Boolean = true) {
+// A PixelCopy copy of a SurfaceView. In content mode it is shown in the
+// SurfaceView's overlay (inside the blurred subtree); in backdrop mode it is
+// drawn into the backdrop recording instead.
+private class SurfaceMirror(val view: SurfaceView, val inOverlay: Boolean) {
     val frames = arrayOfNulls<BitmapDrawable>(2)
     var next = 0
     var shown: BitmapDrawable? = null
@@ -91,6 +94,11 @@ private fun luminancePlateLine(values: FloatArray): Pair<Float, Float> {
 }
 
 class BlurView(context: Context) : ReactViewGroup(context) {
+
+    private companion object {
+        // Depth of backdrop captures in progress on the UI thread.
+        var captureDepth = 0
+    }
 
     private val density = context.resources.displayMetrics.density
 
@@ -126,9 +134,25 @@ class BlurView(context: Context) : ReactViewGroup(context) {
     private val preDrawListener = ViewTreeObserver.OnPreDrawListener {
         applyChildEffects()
         surfaceMirrors.values.forEach(::syncSurfaceAlpha)
-        if (backdropMode && blurEffect != null) invalidate()
+        // Re-capture the backdrop every frame, but only while this view is on
+        // screen; a long list can hold many BlurViews that are scrolled away.
+        if (backdropMode && blurEffect != null && getGlobalVisibleRect(selfRect)) invalidate()
         true
     }
+
+    // Android 12 (API 31-32) keeps the blurred layer of a view with a
+    // RenderEffect when only its children change, so a blurred video froze on
+    // its first (black) frame. There the content is recorded into a fresh
+    // RenderNode each frame instead, as in backdrop mode.
+    private val recordsContent =
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU
+
+    // Ancestors of mirrored SurfaceViews that are drawn by hand (backdrop mode,
+    // and content mode on API 31-32). Drawing recurses into these instead of
+    // drawing them in one call, so the SurfaceViews can be replaced by copies.
+    private val surfaceAncestors = HashSet<View>()
+    private val overlapRect = Rect()
+    private val selfRect = Rect()
     private val mirrorFrameCallback = object : Choreographer.FrameCallback {
         override fun doFrame(frameTimeNanos: Long) {
             if (!mirrorLoopRunning) return
@@ -157,10 +181,7 @@ class BlurView(context: Context) : ReactViewGroup(context) {
 
     private val fallbackPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
 
-    val blurContent = BlurContentView(context) {
-        syncSurfaceMirrors()
-        applyEffects()
-    }
+    val blurContent = BlurContentView(context) { applyEffects() }
 
     init {
         setWillNotDraw(false)
@@ -247,14 +268,14 @@ class BlurView(context: Context) : ReactViewGroup(context) {
     private val hasCorners get() = cornerRadii.any { it > 0f }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-        val widthMode = MeasureSpec.getMode(widthMeasureSpec)
-        val heightMode = MeasureSpec.getMode(heightMeasureSpec)
-        if (widthMode == MeasureSpec.EXACTLY && heightMode == MeasureSpec.EXACTLY) {
+        // React Native always measures exactly. ReactViewGroup throws for
+        // anything else, which happens when BlurView is used from native code.
+        if (MeasureSpec.getMode(widthMeasureSpec) == MeasureSpec.EXACTLY &&
+            MeasureSpec.getMode(heightMeasureSpec) == MeasureSpec.EXACTLY
+        ) {
             super.onMeasure(widthMeasureSpec, heightMeasureSpec)
         } else {
-            val width = MeasureSpec.getSize(widthMeasureSpec)
-            val height = MeasureSpec.getSize(heightMeasureSpec)
-            setMeasuredDimension(width, height)
+            setMeasuredDimension(MeasureSpec.getSize(widthMeasureSpec), MeasureSpec.getSize(heightMeasureSpec))
         }
         blurContent.measure(
             MeasureSpec.makeMeasureSpec(measuredWidth, MeasureSpec.EXACTLY),
@@ -294,12 +315,49 @@ class BlurView(context: Context) : ReactViewGroup(context) {
     // ponytail: rescans the whole subtree on every global layout to find SurfaceViews (O(n) per layout);
     // upgrade path is an OnHierarchyChangeListener chain if the blurred tree gets large.
     private fun syncSurfaceMirrors() {
-        val found: List<SurfaceView> = if (blurEffect != null && isAttachedToWindow) {
-            if (backdropMode) collectBackdropSiblingViews() else collectSurfaceViews(this, mutableListOf())
-        } else emptyList()
+        surfaceAncestors.clear()
+        val found = when {
+            blurEffect == null || !isAttachedToWindow -> emptyList()
+            backdropMode -> collectBackdropSurfaceViews()
+            else -> collectSurfaceViews(this, mutableListOf())
+        }
+        // On API 31-32 a SurfaceView's overlay is hidden together with the
+        // SurfaceView, so content mode draws the copies itself there.
+        val inOverlay = !backdropMode && !recordsContent
+        if (!inOverlay) addSurfaceAncestors(found)
         (surfaceMirrors.keys - found.toSet()).forEach(::releaseMirror)
-        found.forEach { sv -> surfaceMirrors.getOrPut(sv) { SurfaceMirror(sv, useOverlay = !backdropMode) } }
+        surfaceMirrors.values.filter { it.inOverlay != inOverlay }.map { it.view }.forEach(::releaseMirror)
+        found.forEach { surfaceMirrors.getOrPut(it) { SurfaceMirror(it, inOverlay) } }
         updateMirrorLoop()
+    }
+
+    // SurfaceViews drawn before this view (earlier siblings of it or of its
+    // ancestors, and their descendants). They are composited outside the view
+    // tree, so the backdrop recording cannot draw them directly.
+    private fun collectBackdropSurfaceViews(): List<SurfaceView> {
+        val out = mutableListOf<SurfaceView>()
+        var child: View = this
+        var parent = child.parent as? ViewGroup
+        while (parent != null) {
+            for (index in 0 until parent.indexOfChild(child)) {
+                when (val sibling = parent.getChildAt(index)) {
+                    is SurfaceView -> out.add(sibling)
+                    is ViewGroup -> collectSurfaceViews(sibling, out)
+                }
+            }
+            child = parent
+            parent = child.parent as? ViewGroup
+        }
+        return out
+    }
+
+    private fun addSurfaceAncestors(surfaces: List<SurfaceView>) {
+        for (surface in surfaces) {
+            var ancestor = surface.parent as? View
+            while (ancestor != null && surfaceAncestors.add(ancestor)) {
+                ancestor = ancestor.parent as? View
+            }
+        }
     }
 
     private fun updateMirrorLoop() {
@@ -373,35 +431,6 @@ class BlurView(context: Context) : ReactViewGroup(context) {
         return out
     }
 
-    /** Walk up the tree and collect SurfaceViews that are siblings drawn before us (backdrop mode). */
-    private fun collectBackdropSiblingViews(): List<SurfaceView> {
-        val out = mutableListOf<SurfaceView>()
-        var child: View = this
-        var parent = child.parent as? ViewGroup
-        while (parent != null) {
-            val branchIndex = parent.indexOfChild(child)
-            for (index in 0 until branchIndex) {
-                val sibling = parent.getChildAt(index) ?: continue
-                if (sibling.visibility != View.VISIBLE) continue
-                if (sibling is SurfaceView) out.add(sibling)
-                else if (sibling is ViewGroup) collectSurfaceViews(sibling, out)
-            }
-            child = parent
-            parent = child.parent as? ViewGroup
-        }
-        return out
-    }
-
-    private fun hasSurfaceViewDescendant(view: ViewGroup): Boolean {
-        for (i in 0 until view.childCount) {
-            when (val child = view.getChildAt(i)) {
-                is SurfaceView -> return true
-                is ViewGroup -> if (hasSurfaceViewDescendant(child)) return true
-            }
-        }
-        return false
-    }
-
     private fun startMirrorLoop() {
         if (mirrorLoopRunning) return
         mirrorLoopRunning = true
@@ -422,6 +451,8 @@ class BlurView(context: Context) : ReactViewGroup(context) {
             mirror.ready = true
             return
         }
+        // A backdrop SurfaceView that is not behind this view right now needs no copy.
+        if (!mirror.inOverlay && !overlapsOnScreen(view)) return
         val frame = mirrorFrameBuffer(
             mirror,
             (view.width / SURFACE_MIRROR_DOWNSCALE).coerceAtLeast(1),
@@ -429,7 +460,6 @@ class BlurView(context: Context) : ReactViewGroup(context) {
         )
         mirror.copying = true
         PixelCopy.request(view, frame.bitmap, { result ->
-            android.util.Log.d("BlurView", "PixelCopy result: $result (SUCCESS=${PixelCopy.SUCCESS})")
             mirror.copying = false
             mirror.ready = true
             if (result == PixelCopy.SUCCESS && surfaceMirrors[view] === mirror) showMirror(mirror, frame)
@@ -448,7 +478,7 @@ class BlurView(context: Context) : ReactViewGroup(context) {
 
     private fun showMirror(mirror: SurfaceMirror, frame: BitmapDrawable) {
         frame.setBounds(0, 0, mirror.view.width, mirror.view.height)
-        if (mirror.useOverlay) {
+        if (mirror.inOverlay) {
             val overlay = mirror.view.overlay
             mirror.shown?.let { if (it !== frame) overlay.remove(it) }
             if (mirror.shown !== frame) overlay.add(frame) else mirror.view.invalidate()
@@ -458,19 +488,29 @@ class BlurView(context: Context) : ReactViewGroup(context) {
     }
 
     private fun syncSurfaceAlpha(mirror: SurfaceMirror) {
-        if (!mirror.useOverlay) return  // backdrop siblings are drawn directly in captureBackdrop, not via overlay
+        if (!mirror.inOverlay) return
         val shown = mirror.shown ?: return
         if (appliedEffect == null) {
             shown.alpha = 0
             return
         }
-        shown.alpha = 255
+        val view = mirror.view
+        if (mirror.ownerAlpha.isNaN() || view.alpha != 0f) {
+            mirror.ownerAlpha = view.alpha
+            view.alpha = 0f
+        }
+        shown.alpha = (mirror.ownerAlpha * 255).toInt()
     }
+
+    private fun overlapsOnScreen(view: View): Boolean =
+        view.getGlobalVisibleRect(overlapRect) && getGlobalVisibleRect(selfRect) &&
+            Rect.intersects(overlapRect, selfRect)
 
     private fun releaseMirror(view: SurfaceView) {
         val mirror = surfaceMirrors.remove(view) ?: return
-        if (mirror.useOverlay) mirror.shown?.let { view.overlay.remove(it) }
+        if (mirror.inOverlay) mirror.shown?.let { view.overlay.remove(it) }
         mirror.shown = null
+        if (!mirror.ownerAlpha.isNaN()) view.alpha = mirror.ownerAlpha
     }
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
@@ -631,7 +671,7 @@ class BlurView(context: Context) : ReactViewGroup(context) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return
         val waitingForMirror = appliedEffect == null && surfaceMirrors.values.any { !it.ready }
         appliedEffect = if (backdropMode || waitingForMirror) null else blurEffect
-        blurContent.setRenderEffect(appliedEffect)
+        blurContent.setRenderEffect(if (recordsContent) null else appliedEffect)
     }
 
     override fun dispatchDraw(canvas: Canvas) {
@@ -640,13 +680,28 @@ class BlurView(context: Context) : ReactViewGroup(context) {
             drawTint(canvas)
             super.dispatchDraw(canvas)
         } else {
-            super.dispatchDraw(canvas)
+            val effect = appliedEffect
+            if (recordsContent && effect != null) drawContentNode(canvas, effect) else super.dispatchDraw(canvas)
             drawTint(canvas)
         }
 
         if (intensity > 0f) {
             canvas.drawPath(rimPath, rimPaint)
         }
+    }
+
+    private fun drawContentNode(canvas: Canvas, effect: RenderEffect) {
+        if (!canvas.isHardwareAccelerated || width <= 0 || height <= 0) return super.dispatchDraw(canvas)
+        val node = RenderNode("blurContent")
+        node.setPosition(0, 0, width, height)
+        val recording = node.beginRecording(width, height)
+        try {
+            if (blurContent in surfaceAncestors) drawCaptured(recording, blurContent) else drawChild(recording, blurContent, drawingTime)
+        } finally {
+            node.endRecording()
+        }
+        node.setRenderEffect(effect)
+        canvas.drawRenderNode(node)
     }
 
     private fun drawTint(canvas: Canvas) {
@@ -660,6 +715,10 @@ class BlurView(context: Context) : ReactViewGroup(context) {
 
     private fun drawBackdrop(canvas: Canvas) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return
+        // A BlurView drawn inside another BlurView's backdrop capture does not
+        // capture its own backdrop: that would re-run every nested capture and
+        // grows exponentially with the number of overlapping BlurViews.
+        if (captureDepth > 0) return
         val effect = blurEffect ?: return
         if (!canvas.isHardwareAccelerated || width <= 0 || height <= 0) return
         // Android 12 (API 31-32) keeps the blurred layer of a reused RenderNode
@@ -672,9 +731,11 @@ class BlurView(context: Context) : ReactViewGroup(context) {
         }
         node.setPosition(0, 0, width, height)
         val recording = node.beginRecording(width, height)
+        captureDepth++
         try {
             captureBackdrop(recording)
         } finally {
+            captureDepth--
             node.endRecording()
         }
         node.setRenderEffect(effect)
@@ -712,37 +773,34 @@ class BlurView(context: Context) : ReactViewGroup(context) {
                 canvas.translate(sibling.left - offset[0], sibling.top - offset[1])
                 if (!sibling.matrix.isIdentity) canvas.concat(sibling.matrix)
                 canvas.translate(-sibling.scrollX.toFloat(), -sibling.scrollY.toFloat())
-                drawCaptureSubtree(canvas, sibling)
+                drawCaptured(canvas, sibling)
                 canvas.restoreToCount(saved)
             }
         }
     }
 
-    /**
-     * Draws [view] onto [canvas] for the backdrop capture pass.
-     * SurfaceViews cannot be drawn via Canvas; instead we substitute the PixelCopy mirror
-     * tracked in [surfaceMirrors]. If a ViewGroup contains SurfaceView descendants we
-     * recurse into it child-by-child so only the SurfaceViews themselves are substituted.
-     */
-    private fun drawCaptureSubtree(canvas: Canvas, view: View) {
+    // Draws a view into the backdrop recording. The canvas is already at the
+    // view's position with its scroll applied. SurfaceViews are replaced by
+    // their PixelCopy copy; views that contain one are drawn child by child.
+    private fun drawCaptured(canvas: Canvas, view: View) {
         when {
-            view is SurfaceView -> {
-                // Draw the PixelCopy mirror if one is ready, otherwise leave transparent.
-                surfaceMirrors[view]?.shown?.draw(canvas)
+            view is SurfaceView -> surfaceMirrors[view]?.shown?.let { frame ->
+                frame.alpha = (view.alpha * 255).toInt()
+                frame.draw(canvas)
             }
-            view is ViewGroup && hasSurfaceViewDescendant(view) -> {
-                // Draw background then recurse into children individually.
-                view.background?.let { bg ->
-                    bg.setBounds(0, 0, view.width, view.height)
-                    bg.draw(canvas)
+            view is ViewGroup && view in surfaceAncestors -> {
+                view.background?.let { background ->
+                    background.setBounds(0, 0, view.width, view.height)
+                    background.draw(canvas)
                 }
-                for (i in 0 until view.childCount) {
-                    val child = view.getChildAt(i) ?: continue
+                for (index in 0 until view.childCount) {
+                    val child = view.getChildAt(index) ?: continue
                     if (child.visibility != View.VISIBLE) continue
                     val saved = canvas.save()
-                    canvas.translate((child.left - view.scrollX).toFloat(), (child.top - view.scrollY).toFloat())
+                    canvas.translate(child.left.toFloat(), child.top.toFloat())
                     if (!child.matrix.isIdentity) canvas.concat(child.matrix)
-                    drawCaptureSubtree(canvas, child)
+                    canvas.translate(-child.scrollX.toFloat(), -child.scrollY.toFloat())
+                    drawCaptured(canvas, child)
                     canvas.restoreToCount(saved)
                 }
             }
@@ -751,13 +809,18 @@ class BlurView(context: Context) : ReactViewGroup(context) {
     }
 }
 
+// Holds the BlurView's children. React Native positions its own children
+// (which always have an id, their React tag). Views added directly from native
+// code (no id) fill the BlurView.
 class BlurContentView(context: Context, private val onChildAdded: () -> Unit) : ViewGroup(context) {
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         val width = MeasureSpec.getSize(widthMeasureSpec)
         val height = MeasureSpec.getSize(heightMeasureSpec)
         setMeasuredDimension(width, height)
-        for (i in 0 until childCount) {
-            getChildAt(i).measure(
+        for (index in 0 until childCount) {
+            val child = getChildAt(index)
+            if (child.id != View.NO_ID) continue
+            child.measure(
                 MeasureSpec.makeMeasureSpec(width, MeasureSpec.EXACTLY),
                 MeasureSpec.makeMeasureSpec(height, MeasureSpec.EXACTLY)
             )
@@ -765,13 +828,9 @@ class BlurContentView(context: Context, private val onChildAdded: () -> Unit) : 
     }
 
     override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
-        val w = right - left
-        val h = bottom - top
-        for (i in 0 until childCount) {
-            val child = getChildAt(i)
-            if (child.width == 0 && child.height == 0) {
-                child.layout(0, 0, w, h)
-            }
+        for (index in 0 until childCount) {
+            val child = getChildAt(index)
+            if (child.id == View.NO_ID) child.layout(0, 0, right - left, bottom - top)
         }
     }
 
