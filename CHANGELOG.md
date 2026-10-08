@@ -29,6 +29,21 @@ import BlurView from '@nguyenduy1412/react-native-blur';
 </View>
 ```
 
+### Highlight: full support for Android 12 (API 31-32), not only API 33+
+
+Android 12 (API 31-32) has `RenderEffect` but behaves differently from API 33+, and earlier versions broke there. 2.1.0 has a separate renderer for API 31-32, so Android 12 now gets the same results as Android 13+:
+
+| Android | API | 2.1.0 |
+| --- | --- | --- |
+| 13 and later | 33+ | Real blur, backdrop and content, video blur |
+| **12 / 12L** | **31-32** | **Real blur, backdrop and content, video blur (fixed in 2.1.0)** |
+| 11 and earlier | ≤ 30 | Translucent material plate (no blur), stays readable |
+
+- Backdrop no longer freezes while content behind it scrolls on Android 12.
+- Video blur works on Android 12: content mode no longer shows black, backdrop over `expo-video` / `react-native-video` stays in sync with the video.
+- Faster on Android 12: half-size video copies (a full copy took ~48 ms on API 31) taken off the UI thread.
+- Android 11 and below: the fallback plate stays readable at low `intensity`.
+
 ### Features
 
 - Backdrop mode works inside React Native `<Modal>` on Android. The screen behind the modal window is copied with `PixelCopy` and blurred, as on iOS.

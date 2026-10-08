@@ -30,6 +30,10 @@ Blur what is behind headers, tab bars, cards, popups and buttons while their con
 > - **Content mode on video**: blur a whole player, Android 12 included.
 > - **Light**: frame copies run off the UI thread, are shared by every `BlurView` over the same video, and stop while it is paused or off screen.
 >
+> ### 🤖 Android 12 (API 31-32) fully supported, not only API 33+
+>
+> Android 12 / 12L now gets real backdrop blur, content blur and video blur like Android 13+, with its own renderer: no more frozen backdrop while scrolling, no more black video. Android 11 and below get a readable material plate.
+>
 > Also new: backdrop inside `<Modal>` on Android, per-corner radii, any `tintColor`, and Reanimated `intensity`. See the [changelog](./CHANGELOG.md).
 
 ## Features
@@ -84,7 +88,7 @@ bun add @nguyenduy1412/react-native-blur
 | --- | --- |
 | React Native | 0.76 with the New Architecture (Fabric). Tested with React Native 0.86. |
 | iOS | 15.1 |
-| Android | API 31 (Android 12) for the blur. Older versions draw a translucent material plate without blur, so content stays readable. |
+| Android | API 31 (Android 12) for the blur: Android 12 / 12L (API 31-32) and 13+ (API 33+) get the same blur and video blur. Older versions draw a translucent material plate without blur, so content stays readable. |
 | Expo (optional) | Tested with Expo SDK 57 |
 
 ## Quick start
