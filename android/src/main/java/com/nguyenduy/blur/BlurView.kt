@@ -98,6 +98,10 @@ class BlurView(context: Context) : ReactViewGroup(context) {
     private companion object {
         // Depth of backdrop captures in progress on the UI thread.
         var captureDepth = 0
+
+        // SurfaceViews with a PixelCopy in flight, across all BlurViews.
+        // Overlapping copies of one SurfaceView stall its video decoder.
+        val copiesInFlight = HashSet<SurfaceView>()
     }
 
     private val density = context.resources.displayMetrics.density
@@ -321,9 +325,7 @@ class BlurView(context: Context) : ReactViewGroup(context) {
             backdropMode -> collectBackdropSurfaceViews()
             else -> collectSurfaceViews(this, mutableListOf())
         }
-        // On API 31-32 a SurfaceView's overlay is hidden together with the
-        // SurfaceView, so content mode draws the copies itself there.
-        val inOverlay = !backdropMode && !recordsContent
+        val inOverlay = !backdropMode
         if (!inOverlay) addSurfaceAncestors(found)
         (surfaceMirrors.keys - found.toSet()).forEach(::releaseMirror)
         surfaceMirrors.values.filter { it.inOverlay != inOverlay }.map { it.view }.forEach(::releaseMirror)
@@ -458,13 +460,22 @@ class BlurView(context: Context) : ReactViewGroup(context) {
             (view.width / SURFACE_MIRROR_DOWNSCALE).coerceAtLeast(1),
             (view.height / SURFACE_MIRROR_DOWNSCALE).coerceAtLeast(1)
         )
+        if (!copiesInFlight.add(view)) return
         mirror.copying = true
-        PixelCopy.request(view, frame.bitmap, { result ->
+        try {
+            PixelCopy.request(view, frame.bitmap, { result ->
+                copiesInFlight.remove(view)
+                mirror.copying = false
+                mirror.ready = true
+                if (result == PixelCopy.SUCCESS && surfaceMirrors[view] === mirror) showMirror(mirror, frame)
+                invalidate()
+            }, mainHandler)
+        } catch (e: IllegalArgumentException) {
+            // The surface was released between the validity check and the request.
+            copiesInFlight.remove(view)
             mirror.copying = false
             mirror.ready = true
-            if (result == PixelCopy.SUCCESS && surfaceMirrors[view] === mirror) showMirror(mirror, frame)
-            invalidate()
-        }, mainHandler)
+        }
     }
 
     private fun mirrorFrameBuffer(mirror: SurfaceMirror, width: Int, height: Int): BitmapDrawable {
@@ -495,6 +506,14 @@ class BlurView(context: Context) : ReactViewGroup(context) {
             return
         }
         val view = mirror.view
+        // Hiding the SurfaceView (alpha 0) keeps its sharp video from showing
+        // through the blurred copy. On API 31-32 that also hides the overlay
+        // holding the copy, so the SurfaceView stays visible there; the copy
+        // drawn over it inside the blurred layer covers it.
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+            shown.alpha = (view.alpha * 255).toInt()
+            return
+        }
         if (mirror.ownerAlpha.isNaN() || view.alpha != 0f) {
             mirror.ownerAlpha = view.alpha
             view.alpha = 0f

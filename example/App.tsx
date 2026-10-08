@@ -110,11 +110,18 @@ export default function App() {
         setVideo6Paused(false);
         setVideo7Paused(false);
       }
+      if (url.includes('play=7')) {
+        setPlayAll(false);
+        setVideo6Paused(true);
+        setVideo7Paused(false);
+      }
       if (url.includes('play=8')) {
         setPlayAll(true);
         setVideo6Paused(true);
         setVideo7Paused(true);
       }
+      if (url.includes('only8=1')) setOnly8(true);
+      if (url.includes('only8=0')) setOnly8(false);
       const matchI8 = url.match(/[?&]i8=(\d+)/);
       if (matchI8) setIntensity8(parseInt(matchI8[1], 10));
       const matchMode = url.match(/[?&]mode=(split|full|sharp)/);
@@ -157,6 +164,7 @@ export default function App() {
   const [blurEffectMode, setBlurEffectMode] = useState<'split' | 'full' | 'sharp'>('split');
   const [playAll, setPlayAll] = useState(false);
   const [intensity8, setIntensity8] = useState(60);
+  const [only8, setOnly8] = useState(false);
 
   const animatedProps = useAnimatedProps(() => ({
     intensity: animatedIntensity.value,
@@ -692,10 +700,12 @@ export default function App() {
             <Video source={VIDEO_SOURCE} style={StyleSheet.absoluteFill} resizeMode="cover" repeat muted paused={!playAll} viewType={ViewType.SURFACE} />
             <Text style={{ color: 'white', fontWeight: '700', margin: 8 }}>SurfaceView</Text>
           </BlurView>
+          {!only8 && (
           <BlurView intensity={intensity8} tint="systemMaterial" style={{ flex: 1, height: 180, borderRadius: 16 }}>
             <Video source={VIDEO_SOURCE} style={StyleSheet.absoluteFill} resizeMode="cover" repeat muted paused={!playAll} viewType={ViewType.TEXTURE} />
             <Text style={{ color: 'white', fontWeight: '700', margin: 8 }}>TextureView</Text>
           </BlurView>
+          )}
         </View>
 
         {/* Spacing for bottom floating bar */}
