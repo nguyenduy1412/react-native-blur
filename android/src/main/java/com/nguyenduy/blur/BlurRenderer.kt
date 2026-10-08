@@ -42,6 +42,12 @@ internal interface BlurRenderer {
      */
     fun showSurfaceCopy(mirror: SurfaceMirror, effectApplied: Boolean)
 
+    /**
+     * Downscale of a SurfaceView copy that covers the live video (backdrop
+     * mode with syncVideo). 1 is full size.
+     */
+    val coverDownscale: Int
+
     companion object {
         fun create(): BlurRenderer? = when {
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU -> ModernBlurRenderer()
@@ -56,6 +62,8 @@ internal interface BlurRenderer {
 internal class ModernBlurRenderer : BlurRenderer {
 
     private var node: RenderNode? = null
+
+    override val coverDownscale = 1
 
     override fun backdropNode(): RenderNode =
         node ?: RenderNode("blurBackdrop").also { node = it }
@@ -98,6 +106,10 @@ internal class ModernBlurRenderer : BlurRenderer {
  */
 @RequiresApi(Build.VERSION_CODES.S)
 internal class LegacyBlurRenderer : BlurRenderer {
+
+    // Half size: a full-size copy took ~48 ms on API 31 against ~27 ms on
+    // API 37. The covering copy is slightly softer than the live video.
+    override val coverDownscale = 2
 
     override fun backdropNode(): RenderNode = RenderNode("blurBackdrop")
 

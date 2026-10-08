@@ -33,6 +33,14 @@ export interface BlurViewProps extends ViewProps {
   blurRadius?: number;
   saturation?: number;
   borderRadius?: number;
+  /**
+   * Android only, backdrop mode over a SurfaceView video (default true).
+   * true: the video is shown from the same copy that is blurred, so the sharp
+   * and blurred parts always match; heavier, and capped at the copy rate.
+   * false: the live video stays visible and only a quarter-size copy is
+   * blurred; lighter, but the blurred part trails the video by 1-2 frames.
+   */
+  syncVideo?: boolean;
   children?: React.ReactNode;
   style?: StyleProp<ViewStyle>;
 }
@@ -73,6 +81,7 @@ export const BlurView = React.forwardRef<View, BlurViewProps>(function BlurView(
     blurRadius,
     saturation,
     borderRadius: customBorderRadius,
+    syncVideo = true,
     style,
     children,
     ...props
@@ -96,6 +105,7 @@ export const BlurView = React.forwardRef<View, BlurViewProps>(function BlurView(
         tintColor={tintColor}
         cornerRadii={cornerRadii}
         colorScheme={colorScheme ?? undefined}
+        syncVideo={syncVideo}
         style={[
           styles.container,
           style,

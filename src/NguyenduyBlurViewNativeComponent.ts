@@ -10,6 +10,9 @@ export interface NativeProps extends ViewProps {
   // The app's colour scheme ('light' | 'dark'), so materials follow
   // Appearance.setColorScheme overrides on Android.
   colorScheme?: string;
+  // Android: keep a SurfaceView behind a backdrop in sync with its blur by
+  // covering it with the copy that is blurred.
+  syncVideo?: CodegenTypes.WithDefault<boolean, true>;
   // Corner radii in dp: top-left, top-right, bottom-right, bottom-left.
   cornerRadii?: ReadonlyArray<CodegenTypes.Float>;
 }

@@ -39,6 +39,9 @@ const VIDEO_SOURCE = Platform.select({
   default: { uri: 'sample' },
 });
 
+// 60 fps test pattern (Android only, res/raw/sample60.mp4).
+const VIDEO_SOURCE_60 = Platform.select({ android: { uri: 'sample60' }, default: VIDEO_SOURCE });
+
 const COLORS = [
   '#ff3b30',
   '#ff9500',
@@ -125,6 +128,10 @@ export default function App() {
         setVideo6Paused(true);
         setVideo7Paused(false);
       }
+      if (url.includes('v60=1')) setVideo60(true);
+      if (url.includes('v60=0')) setVideo60(false);
+      if (url.includes('sync=0')) setSyncVideo(false);
+      if (url.includes('sync=1')) setSyncVideo(true);
       if (url.includes('play=6')) {
         setPlayAll(false);
         setVideo6Paused(false);
@@ -189,6 +196,8 @@ export default function App() {
   const [intensity8, setIntensity8] = useState(10);
   const [only8, setOnly8] = useState(false);
   const [video9Paused, setVideo9Paused] = useState(false);
+  const [syncVideo, setSyncVideo] = useState(true);
+  const [video60, setVideo60] = useState(false);
 
   const animatedProps = useAnimatedProps(() => ({
     intensity: animatedIntensity.value,
@@ -223,7 +232,7 @@ export default function App() {
         <View style={styles.heroWrapper}>
           <ColorfulBackground height={120} count={3} label="Intro" />
           <BlurView
-            mode="backdrop"
+            mode="backdrop" syncVideo={syncVideo}
             intensity={10}
             tint="systemMaterial"
             style={styles.heroCard}
@@ -246,7 +255,7 @@ export default function App() {
           <ColorfulBackground height={360} count={9} label="Material" />
           <View style={styles.overlayCards}>
             <BlurView
-              mode="backdrop"
+              mode="backdrop" syncVideo={syncVideo}
               intensity={10}
               tint="systemUltraThinMaterial"
               style={styles.glassCard}
@@ -256,7 +265,7 @@ export default function App() {
             </BlurView>
 
             <BlurView
-              mode="backdrop"
+              mode="backdrop" syncVideo={syncVideo}
               intensity={10}
               tint="systemThinMaterial"
               style={styles.glassCard}
@@ -266,7 +275,7 @@ export default function App() {
             </BlurView>
 
             <BlurView
-              mode="backdrop"
+              mode="backdrop" syncVideo={syncVideo}
               intensity={10}
               tint="systemMaterial"
               style={styles.glassCard}
@@ -276,7 +285,7 @@ export default function App() {
             </BlurView>
 
             <BlurView
-              mode="backdrop"
+              mode="backdrop" syncVideo={syncVideo}
               intensity={10}
               tint="systemThickMaterial"
               style={styles.glassCard}
@@ -286,7 +295,7 @@ export default function App() {
             </BlurView>
 
             <BlurView
-              mode="backdrop"
+              mode="backdrop" syncVideo={syncVideo}
               intensity={10}
               tint="systemChromeMaterial"
               style={styles.glassCard}
@@ -297,7 +306,7 @@ export default function App() {
 
             <View style={styles.rowTwo}>
               <BlurView
-                mode="backdrop"
+                mode="backdrop" syncVideo={syncVideo}
                 intensity={10}
                 tint="light"
                 style={[styles.glassCard, styles.half]}
@@ -306,7 +315,7 @@ export default function App() {
                 <Text style={styles.cardSub}>Phong cách sáng</Text>
               </BlurView>
               <BlurView
-                mode="backdrop"
+                mode="backdrop" syncVideo={syncVideo}
                 intensity={10}
                 tint="dark"
                 style={[styles.glassCard, styles.half]}
@@ -327,7 +336,7 @@ export default function App() {
           <ColorfulBackground height={260} count={6} label="Color Tint" />
           <View style={styles.overlayCards}>
             <BlurView
-              mode="backdrop"
+              mode="backdrop" syncVideo={syncVideo}
               intensity={10}
               tint="systemMaterial"
               tintColor="rgba(255, 59, 48, 0.35)"
@@ -338,7 +347,7 @@ export default function App() {
             </BlurView>
 
             <BlurView
-              mode="backdrop"
+              mode="backdrop" syncVideo={syncVideo}
               intensity={10}
               tint="systemMaterial"
               tintColor="#00c7be60"
@@ -349,7 +358,7 @@ export default function App() {
             </BlurView>
 
             <BlurView
-              mode="backdrop"
+              mode="backdrop" syncVideo={syncVideo}
               intensity={10}
               tint="systemMaterial"
               tintColor="rgba(88, 86, 214, 0.45)"
@@ -370,7 +379,7 @@ export default function App() {
           <ColorfulBackground height={210} count={5} label="Corners" />
           <View style={styles.overlayCards}>
             <BlurView
-              mode="backdrop"
+              mode="backdrop" syncVideo={syncVideo}
               intensity={10}
               tint="systemThinMaterial"
               style={[
@@ -388,7 +397,7 @@ export default function App() {
             </BlurView>
 
             <BlurView
-              mode="backdrop"
+              mode="backdrop" syncVideo={syncVideo}
               intensity={10}
               tint="systemThinMaterial"
               style={[styles.glassCard, { borderRadius: 36 }]}
@@ -433,7 +442,7 @@ export default function App() {
             <View style={styles.backdropCompareWrapper}>
               <ColorfulBackground height={110} count={3} label="Under" />
               <BlurView
-                mode="backdrop"
+                mode="backdrop" syncVideo={syncVideo}
                 intensity={10}
                 tint="systemMaterial"
                 style={StyleSheet.absoluteFill}
@@ -462,7 +471,7 @@ export default function App() {
           <ColorfulBackground height={160} count={4} label="Dynamic" />
           <View style={styles.overlayCards}>
             <AnimatedBlurView
-              mode="backdrop"
+              mode="backdrop" syncVideo={syncVideo}
               tint="systemMaterial"
               animatedProps={animatedProps}
               style={styles.glassCard}
@@ -523,7 +532,7 @@ export default function App() {
                 </View>
               </View>
               <BlurView
-                mode="backdrop"
+                mode="backdrop" syncVideo={syncVideo}
                 intensity={videoBlurIntensity}
                 tint={videoTint}
                 style={styles.videoSplitRight}
@@ -537,7 +546,7 @@ export default function App() {
 
           {blurEffectMode === 'full' && (
             <BlurView
-              mode="backdrop"
+              mode="backdrop" syncVideo={syncVideo}
               intensity={videoBlurIntensity}
               tint={videoTint}
               style={[StyleSheet.absoluteFill, styles.videoFullBlurOverlay]}
@@ -559,7 +568,7 @@ export default function App() {
 
           {/* Floating Glass Control Card */}
           <BlurView
-            mode="backdrop"
+            mode="backdrop" syncVideo={syncVideo}
             intensity={10}
             tint="systemUltraThinMaterial"
             style={styles.videoFloatingCard}
@@ -660,7 +669,7 @@ export default function App() {
         {/* Card: SurfaceView Video + TextView (10% Blur) */}
         <View style={styles.surfaceVideoContainer}>
           <Video
-            source={VIDEO_SOURCE}
+            source={video60 ? VIDEO_SOURCE_60 : VIDEO_SOURCE}
             style={styles.videoPlayer}
             resizeMode="cover"
             repeat
@@ -682,7 +691,7 @@ export default function App() {
 
           {/* Backdrop Blur Card (10% Blur Intensity) */}
           <BlurView
-            mode="backdrop"
+            mode="backdrop" syncVideo={syncVideo}
             intensity={10}
             tint="systemMaterial"
             style={styles.surfaceBackdropCard}
@@ -750,7 +759,7 @@ export default function App() {
               </View>
               <Text style={styles.surfaceTitleText}>Mercedes-Benz Live Texture</Text>
             </View>
-            <BlurView mode="backdrop" intensity={10} tint="systemMaterial" style={styles.surfaceBackdropCard}>
+            <BlurView mode="backdrop" syncVideo={syncVideo} intensity={10} tint="systemMaterial" style={styles.surfaceBackdropCard}>
               <View style={styles.surfaceCardInner}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                   <View style={styles.surfaceBlurTag}>
@@ -775,7 +784,7 @@ export default function App() {
 
       {/* FIXED TOP HEADER (Backdrop Blur) */}
       <BlurView
-        mode="backdrop"
+        mode="backdrop" syncVideo={syncVideo}
         intensity={10}
         tint="systemMaterial"
         style={styles.topHeader}
@@ -803,7 +812,7 @@ export default function App() {
 
       {/* FLOATING BOTTOM TAB BAR (Backdrop Blur) */}
       <BlurView
-        mode="backdrop"
+        mode="backdrop" syncVideo={syncVideo}
         intensity={10}
         tint="systemUltraThinMaterial"
         style={styles.bottomBar}
@@ -828,7 +837,7 @@ export default function App() {
       {modalVisible && (
         <View style={styles.modalContainer}>
           <BlurView
-            mode="backdrop"
+            mode="backdrop" syncVideo={syncVideo}
             intensity={10}
             tint="dark"
             style={StyleSheet.absoluteFill}
@@ -838,7 +847,7 @@ export default function App() {
             onPress={() => setModalVisible(false)}
           />
           <BlurView
-            mode="backdrop"
+            mode="backdrop" syncVideo={syncVideo}
             intensity={10}
             tint="systemMaterial"
             style={styles.modalCard}

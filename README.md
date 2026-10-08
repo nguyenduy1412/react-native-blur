@@ -265,6 +265,7 @@ Accepts every `View` prop, plus:
 | `borderRadius` | `number` | `style.borderRadius` or `0` | iOS, Android | Corner radius for the blur, tint and rim. Per-corner style radii (`borderTopLeftRadius`, `borderTopStartRadius`…) are supported too. |
 | `blurRadius` | `number` | from `tint` | Android, Web | Overrides the material's blur radius, in dp. |
 | `saturation` | `number` | `1` | Android, Web | Multiplier on the material's saturation boost. |
+| `syncVideo` | `boolean` | `true` | Android | Backdrop over a `SurfaceView` video: `true` shows the video from the same copy that is blurred, so sharp and blurred parts match (heavier, capped at the copy rate, about 20-30 fps on emulators). `false` keeps the live video and blurs a quarter-size copy (lighter, blurred part trails by 1-2 frames). |
 | `children` | `ReactNode` | — | all | The content to blur. |
 
 ### `tint` values
@@ -297,6 +298,7 @@ Accepts every `View` prop, plus:
 ## Limitations
 
 - **Android 11 and below** have no `RenderEffect`, so they draw a translucent plate in the material's colour instead of a blur.
+- **60 fps `SurfaceView` video under a backdrop** is shown at the copy rate while `syncVideo` is on. Use `syncVideo={false}`, or a `TextureView` player (expo-video `surfaceType="textureView"`, react-native-video 7 `surfaceType="texture"`), which needs no copy at all.
 - **`blurRadius` and `saturation`** are ignored on iOS, which uses the system material as is.
 - **Video copies on Android** are made at quarter resolution, as fast as `PixelCopy` returns them (usually the video's own frame rate). The blurred video trails the real one by one or two frames, which you can notice where sharp and blurred video sit side by side.
 - **Colour fidelity:** Android fits each iOS luminance curve with a single colour matrix, so it averages about 2 / 255 off iOS. `systemChromeMaterial` is the outlier, at up to about 23 / 255.

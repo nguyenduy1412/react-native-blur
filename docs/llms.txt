@@ -60,6 +60,7 @@ Blur a playing video:
 - `borderRadius` (number): corner radius for blur, tint and rim. Also read from style.borderRadius and per-corner style radii (borderTopLeftRadius, ...).
 - `blurRadius` (number, Android and Web only): overrides the material's blur radius in dp.
 - `saturation` (number, Android and Web only, default 1): multiplier on the material's saturation.
+- `syncVideo` (boolean, Android, default true): for backdrop over SurfaceView video, true keeps sharp and blurred parts in sync by showing the copied frames (capped at the copy rate); false keeps the live video and lets the blurred part trail 1-2 frames.
 - All View props are accepted.
 
 ## Requirements and limits

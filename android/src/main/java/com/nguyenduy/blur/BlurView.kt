@@ -68,12 +68,15 @@ private const val SURFACE_MIRROR_DOWNSCALE = 4
 private const val WINDOW_MIRROR_INTERVAL_NANOS = 33_000_000L
 private const val WINDOW_MIRROR_DOWNSCALE = 2
 
-// A PixelCopy copy of a SurfaceView, shown in the SurfaceView's overlay.
-// Content mode: a quarter-size copy that the content blur blurs in place.
-// Backdrop mode: a full-size copy that covers the live video, so the sharp
-// video around the BlurView and the blurred copy behind it come from the
-// same frame instead of the copy trailing the live video.
-internal class SurfaceMirror(val view: SurfaceView, val forContent: Boolean) {
+// A PixelCopy copy of a SurfaceView.
+// Content mode: a quarter-size copy in the SurfaceView's overlay that the
+// content blur blurs in place.
+// Backdrop mode with syncVideo (covers): a full-size copy in the overlay that
+// covers the live video, so the sharp video around the BlurView and the
+// blurred copy behind it come from the same frame.
+// Backdrop mode without syncVideo: a quarter-size copy that is only drawn
+// into the backdrop; the live video stays visible.
+internal class SurfaceMirror(val view: SurfaceView, val forContent: Boolean, val covers: Boolean) {
     val frames = arrayOfNulls<BitmapDrawable>(2)
     var next = 0
     var shown: BitmapDrawable? = null
@@ -134,6 +137,7 @@ class BlurView(context: Context) : ReactViewGroup(context) {
     private var blurEffect: RenderEffect? = null
     private var appliedEffect: RenderEffect? = null
     private var backdropMode = false
+    private var syncVideo = true
 
     // Backdrop inside another window (React Native <Modal>): the activity
     // window behind it is copied with PixelCopy and drawn under the siblings.
@@ -234,6 +238,14 @@ class BlurView(context: Context) : ReactViewGroup(context) {
 
     fun setTintColor(color: Int?) {
         tintPaint.color = color ?: Color.TRANSPARENT
+        invalidate()
+    }
+
+    fun setSyncVideo(value: Boolean) {
+        if (value == syncVideo) return
+        syncVideo = value
+        surfaceMirrors.keys.toList().forEach(::releaseMirror)
+        syncSurfaceMirrors()
         invalidate()
     }
 
@@ -338,13 +350,14 @@ class BlurView(context: Context) : ReactViewGroup(context) {
             else -> collectSurfaceViews(this, mutableListOf())
         }
         val forContent = !backdropMode
+        val covers = backdropMode && syncVideo
         if (!forContent) addSurfaceAncestors(found)
         (surfaceMirrors.keys - found.toSet()).forEach(::releaseMirror)
-        surfaceMirrors.values.filter { it.forContent != forContent }.map { it.view }.forEach(::releaseMirror)
+        surfaceMirrors.values.filter { it.forContent != forContent || it.covers != covers }.map { it.view }.forEach(::releaseMirror)
         found.forEach { surface ->
             surfaceMirrors.getOrPut(surface) {
                 mirrorSubscribers.getOrPut(surface) { HashSet() }.add(this)
-                SurfaceMirror(surface, forContent)
+                SurfaceMirror(surface, forContent, covers)
             }
         }
         updateMirrorLoop()
@@ -484,9 +497,10 @@ class BlurView(context: Context) : ReactViewGroup(context) {
             hideMirror(mirror)
             return
         }
-        // A copy that covers the live video must be full size; one that is
-        // only ever blurred can be a quarter of it.
-        val downscale = if (mirrorSubscribers[view]?.any { it.backdropMode } == true) 1 else SURFACE_MIRROR_DOWNSCALE
+        // A copy that covers the live video must be (nearly) full size; one
+        // that is only ever blurred can be a quarter of it.
+        val covered = mirrorSubscribers[view]?.any { it.surfaceMirrors[view]?.covers == true } == true
+        val downscale = if (covered) renderer?.coverDownscale ?: 1 else SURFACE_MIRROR_DOWNSCALE
         val frame = mirrorFrameBuffer(
             mirror,
             (view.width / downscale).coerceAtLeast(1),
@@ -523,6 +537,8 @@ class BlurView(context: Context) : ReactViewGroup(context) {
             return
         }
         if (result == PixelCopy.SUCCESS && surfaceMirrors[view] === mirror) {
+            // Start the GPU upload now rather than in the next frame's draw.
+            frame.bitmap.prepareToDraw()
             showMirror(mirror, frame)
             mirrorSubscribers[view]?.forEach { if (it !== this) it.receiveSharedFrame(view, frame) }
         }
@@ -548,13 +564,15 @@ class BlurView(context: Context) : ReactViewGroup(context) {
 
     private fun showMirror(mirror: SurfaceMirror, frame: BitmapDrawable) {
         frame.setBounds(0, 0, mirror.view.width, mirror.view.height)
-        val overlay = mirror.view.overlay
-        mirror.shown?.let { if (it !== frame) overlay.remove(it) }
-        overlay.add(frame) // no-op when already added
-        mirror.view.invalidate()
+        if (mirror.forContent || mirror.covers) {
+            val overlay = mirror.view.overlay
+            mirror.shown?.let { if (it !== frame) overlay.remove(it) }
+            overlay.add(frame) // no-op when already added
+            mirror.view.invalidate()
+        }
         mirror.shown = frame
         mirror.next = 1 - mirror.next
-        if (!mirror.forContent) frame.alpha = (mirror.view.alpha * 255).toInt()
+        if (mirror.covers) frame.alpha = (mirror.view.alpha * 255).toInt()
     }
 
     // Uncovers the live video, unless another BlurView still shows the copy.
@@ -565,9 +583,14 @@ class BlurView(context: Context) : ReactViewGroup(context) {
         mirror.shown = null
     }
 
+    // Whether this view needs the copy of [view] in the SurfaceView's overlay.
     private fun showsCopyOf(view: SurfaceView): Boolean {
         val mirror = surfaceMirrors[view] ?: return false
-        return if (mirror.forContent) getGlobalVisibleRect(selfRect) else overlapsOnScreen(view)
+        return when {
+            mirror.forContent -> getGlobalVisibleRect(selfRect)
+            mirror.covers -> overlapsOnScreen(view)
+            else -> false
+        }
     }
 
     private fun syncSurfaceAlpha(mirror: SurfaceMirror) {
@@ -585,7 +608,8 @@ class BlurView(context: Context) : ReactViewGroup(context) {
             subscribers.remove(this)
             if (subscribers.isEmpty()) mirrorSubscribers.remove(view)
         }
-        mirror.shown?.let { view.overlay.remove(it) }
+        val stillShown = mirrorSubscribers[view]?.any { it.showsCopyOf(view) } == true
+        if (!stillShown) mirror.shown?.let { view.overlay.remove(it) }
         mirror.shown = null
         if (!mirror.ownerAlpha.isNaN()) view.alpha = mirror.ownerAlpha
     }
@@ -736,7 +760,11 @@ class BlurView(context: Context) : ReactViewGroup(context) {
         val fraction = intensity / 100f
         val material = resolveMaterial()
         val light = material.luminanceValues.average() > 0.5
-        val alpha = ((0.7f + 0.25f * material.luminanceAmount) * fraction).coerceIn(0f, 1f)
+        // Without a blur, a faint plate leaves the content behind it as sharp
+        // as the content on top and both become unreadable, so even a low
+        // intensity keeps the plate at least about half opaque.
+        val strength = if (fraction <= 0f) 0f else 0.5f + 0.5f * fraction
+        val alpha = ((0.7f + 0.25f * material.luminanceAmount) * strength).coerceIn(0f, 1f)
         fallbackPaint.color = if (light) {
             Color.argb((alpha * 255).toInt(), 245, 245, 247)
         } else {

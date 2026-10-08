@@ -14,6 +14,8 @@ All notable changes to `@nguyenduy1412/react-native-blur` are listed here. The p
 - Android: backdrop mode blurs a `SurfaceView` behind it (video players such as `react-native-video` and `expo-video`, maps). Its frames are copied with `PixelCopy` while it is on screen.
 - Android: `BlurView` can be used from native code (non-exact measure specs no longer throw; native children fill the view).
 
+- `syncVideo` prop (Android, default `true`): choose between keeping backdrop blur over a `SurfaceView` video in sync with it, or keeping the live video and a lighter quarter-size copy.
+
 ### Bug fixes
 
 - Android 12 (API 31-32): the backdrop froze while content behind it scrolled. Android 12 kept the blurred layer of a reused `RenderNode`; a fresh node is used per frame there.
@@ -24,6 +26,8 @@ All notable changes to `@nguyenduy1412/react-native-blur` are listed here. The p
 - Android: backdrop blur over a `SurfaceView` no longer lags the sharp video around it. A full-size copy covers the live video, so both come from the same frame.
 - Android: the blurred copy of a video trails it by less. Copies start again as soon as the previous one lands (no fixed 30 fps timer), and one copy of a `SurfaceView` is shared by every `BlurView` that blurs it instead of each waiting its turn.
 - Android: a failed `PixelCopy` request no longer leaves a video copy stuck.
+- Android 12: the copy that covers a `SurfaceView` is half size (a full-size copy took ~48 ms on API 31 against ~27 ms on API 37), and copies are uploaded to the GPU as soon as they arrive.
+- Android 11 and below: the fallback plate stays at least half opaque at low `intensity`, so text over it stays readable.
 - Android: video copies no longer block the UI thread. Up to Android 13 `PixelCopy.request` copied synchronously on the calling thread (9-27 ms per copy on API 31); copies now run on a background thread.
 - Android: a copy that is identical to the one on screen (paused video, or a video slower than the copies) is dropped without uploading or redrawing, and the next copy waits a frame.
 - Android: screens with many backdrop `BlurView`s froze (seconds per frame). Nested backdrop captures no longer re-capture their own backdrop, and only on-screen `BlurView`s re-capture every frame.

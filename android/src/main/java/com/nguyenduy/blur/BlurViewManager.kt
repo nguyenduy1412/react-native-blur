@@ -65,6 +65,11 @@ class BlurViewManager :
         view.setTintColor(value)
     }
 
+    @ReactProp(name = "syncVideo", defaultBoolean = true)
+    override fun setSyncVideo(view: BlurView, value: Boolean) {
+        view.setSyncVideo(value)
+    }
+
     @ReactProp(name = "colorScheme")
     override fun setColorScheme(view: BlurView, value: String?) {
         view.setColorScheme(value)
