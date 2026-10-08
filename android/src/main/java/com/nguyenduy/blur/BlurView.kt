@@ -19,6 +19,7 @@ import android.graphics.Shader
 import android.graphics.drawable.BitmapDrawable
 import android.os.Build
 import android.os.Handler
+import android.os.HandlerThread
 import android.os.Looper
 import android.view.Choreographer
 import android.view.PixelCopy
@@ -79,7 +80,9 @@ internal class SurfaceMirror(val view: SurfaceView, val forContent: Boolean) {
     var copying = false
     var ownerAlpha = Float.NaN
     var ready = false
+    var idleFrames = 0
 }
+
 
 private fun luminancePlateLine(values: FloatArray): Pair<Float, Float> {
     if (values.size < 2) return 0f to values.first()
@@ -106,6 +109,13 @@ class BlurView(context: Context) : ReactViewGroup(context) {
         // BlurView that mirrors the same SurfaceView.
         val copiesInFlight = HashSet<SurfaceView>()
         val mirrorSubscribers = HashMap<SurfaceView, MutableSet<BlurView>>()
+
+        // PixelCopy.request runs the copy synchronously on the calling thread
+        // up to Android 13 (9-27 ms per copy measured on API 31), so it is
+        // issued from this thread instead of the UI thread.
+        val copyHandler: Handler by lazy {
+            Handler(HandlerThread("BlurViewPixelCopy").apply { start() }.looper)
+        }
     }
 
     private val density = context.resources.displayMetrics.density
@@ -456,6 +466,10 @@ class BlurView(context: Context) : ReactViewGroup(context) {
     private fun copySurface(mirror: SurfaceMirror) {
         val view = mirror.view
         if (mirror.copying) return
+        if (mirror.idleFrames > 0) {
+            mirror.idleFrames--
+            return
+        }
         if (view.width <= 0 || view.height <= 0 || !view.holder.surface.isValid) {
             mirror.ready = true
             return
@@ -480,23 +494,39 @@ class BlurView(context: Context) : ReactViewGroup(context) {
         )
         if (!copiesInFlight.add(view)) return
         mirror.copying = true
-        try {
-            PixelCopy.request(view, frame.bitmap, { result ->
-                copiesInFlight.remove(view)
-                mirror.copying = false
-                mirror.ready = true
-                if (result == PixelCopy.SUCCESS && surfaceMirrors[view] === mirror) {
-                    showMirror(mirror, frame)
-                    mirrorSubscribers[view]?.forEach { if (it !== this) it.receiveSharedFrame(view, frame) }
-                }
-                invalidate()
-            }, mainHandler)
-        } catch (e: IllegalArgumentException) {
-            // The surface was released between the validity check and the request.
-            copiesInFlight.remove(view)
-            mirror.copying = false
-            mirror.ready = true
+        val surface = view.holder.surface
+        // The copy being shown; it is the other buffer, so it is not written
+        // by this copy.
+        val previous = mirror.shown?.bitmap
+        copyHandler.post {
+            try {
+                PixelCopy.request(surface, frame.bitmap, { result ->
+                    val unchanged = result == PixelCopy.SUCCESS && previous != null && frame.bitmap.sameAs(previous)
+                    mainHandler.post { onSurfaceCopied(mirror, frame, result, unchanged) }
+                }, copyHandler)
+            } catch (e: IllegalArgumentException) {
+                // The surface was released before the copy started.
+                mainHandler.post { onSurfaceCopied(mirror, frame, PixelCopy.ERROR_SOURCE_INVALID, false) }
+            }
         }
+    }
+
+    private fun onSurfaceCopied(mirror: SurfaceMirror, frame: BitmapDrawable, result: Int, unchanged: Boolean) {
+        val view = mirror.view
+        copiesInFlight.remove(view)
+        mirror.copying = false
+        mirror.ready = true
+        // The video has not changed since the last copy (paused, or slower
+        // than the copies): skip the upload and redraw, and copy less often.
+        if (unchanged) {
+            mirror.idleFrames = 1
+            return
+        }
+        if (result == PixelCopy.SUCCESS && surfaceMirrors[view] === mirror) {
+            showMirror(mirror, frame)
+            mirrorSubscribers[view]?.forEach { if (it !== this) it.receiveSharedFrame(view, frame) }
+        }
+        invalidate()
     }
 
     // A copy of [view] made by another BlurView.
