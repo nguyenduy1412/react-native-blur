@@ -4,6 +4,31 @@ All notable changes to `@nguyenduy1412/react-native-blur` are listed here. The p
 
 ## 2.1.0 (2026-10-08)
 
+### Highlight: video blur with `expo-video` and `react-native-video`
+
+Frosted glass over a playing video now works on both platforms with the two most used video players:
+
+- **[`expo-video`](https://docs.expo.dev/versions/latest/sdk/video/)** (`VideoView`)
+- **[`react-native-video`](https://github.com/TheWidlarzGroup/react-native-video)** (`<Video>`, both `viewType={ViewType.SURFACE}` and `viewType={ViewType.TEXTURE}`)
+
+On Android these players render into a `SurfaceView`, which `RenderEffect` cannot see, so earlier versions showed a black or frozen blur. 2.1.0 copies the video frames with `PixelCopy` while the player is on screen, so:
+
+- `mode="backdrop"` (headers, cards, controls over the video) blurs the live video and stays in sync with it (new `syncVideo` prop, default `true`).
+- `mode="content"` blurs a whole video player, including on Android 12.
+- Copies run off the UI thread, are shared between every `BlurView` over the same video, and are skipped when the video is paused or off screen.
+
+```tsx
+import { VideoView, useVideoPlayer } from 'expo-video';
+import BlurView from '@nguyenduy1412/react-native-blur';
+
+<View style={{ flex: 1 }}>
+  <VideoView player={player} style={StyleSheet.absoluteFill} />
+  <BlurView mode="backdrop" tint="systemMaterial" intensity={60} style={styles.controls}>
+    {/* sharp controls over a blurred video */}
+  </BlurView>
+</View>
+```
+
 ### Features
 
 - Backdrop mode works inside React Native `<Modal>` on Android. The screen behind the modal window is copied with `PixelCopy` and blurred, as on iOS.
@@ -13,7 +38,6 @@ All notable changes to `@nguyenduy1412/react-native-blur` are listed here. The p
 - Android 11 and below draw a translucent plate in the material's colour instead of an almost invisible overlay.
 - Android: backdrop mode blurs a `SurfaceView` behind it (video players such as `react-native-video` and `expo-video`, maps). Its frames are copied with `PixelCopy` while it is on screen.
 - Android: `BlurView` can be used from native code (non-exact measure specs no longer throw; native children fill the view).
-
 - `syncVideo` prop (Android, default `true`): choose between keeping backdrop blur over a `SurfaceView` video in sync with it, or keeping the live video and a lighter quarter-size copy.
 
 ### Bug fixes
@@ -34,10 +58,6 @@ All notable changes to `@nguyenduy1412/react-native-blur` are listed here. The p
 - iOS: `tintColor` values such as `rgba(...)` and named colours were ignored; only `#RRGGBB` worked.
 - iOS: the blur effect is rebuilt when the view re-enters a window or the app returns to the foreground, so `intensity` stays consistent after navigation.
 - iOS: the glass rim is hidden at `intensity={0}`.
-
-### Other
-
-- Example app in `example/` (React Native CLI 0.86, Reanimated) covering every case above.
 
 ## 2.0.3 (2026-10-07)
 
