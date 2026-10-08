@@ -458,8 +458,14 @@ class BlurView(context: Context) : ReactViewGroup(context) {
             mirror.ready = true
             return
         }
-        // A backdrop SurfaceView that is not behind this view right now needs no copy.
-        if (!mirror.inOverlay && !overlapsOnScreen(view)) return
+        // Copies are only needed while they can be seen: a content-mode
+        // BlurView must be on screen, and a backdrop SurfaceView must be
+        // behind this view right now.
+        if (mirror.inOverlay) {
+            if (!getGlobalVisibleRect(selfRect)) return
+        } else if (!overlapsOnScreen(view)) {
+            return
+        }
         val frame = mirrorFrameBuffer(
             mirror,
             (view.width / SURFACE_MIRROR_DOWNSCALE).coerceAtLeast(1),
