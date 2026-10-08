@@ -36,27 +36,35 @@ ${code(`npx expo install ${PKG}\nnpx expo run:ios\nnpx expo run:android`, "sh")}
 const COMMON_FAQ = [
   ["Does it work in Expo Go?", "No. The package contains native code, so it needs a development build (<code>npx expo run:ios</code> / <code>npx expo run:android</code>) or EAS Build. React Native CLI apps work after <code>pod install</code> and a rebuild."],
   ["Does it work without Expo?", "Yes. Since 2.0 it is a plain React Native Fabric component, so a React Native CLI app only needs <code>npm install</code> and <code>pod install</code>."],
-  ["Which Android versions get a real blur?", "Android 12 (API 31) and later, where <code>RenderEffect</code> exists. Android 11 and earlier draw a translucent material plate without blur, so content stays readable."],
+  ["Which Android versions get a real blur?", "Android 12 (API 31) and later, where <code>RenderEffect</code> exists. Android 12 / 12L (API 31-32) gets the same blur and video blur as Android 13+ (API 33+) since 2.1.0, with its own renderer. Android 11 and earlier draw a translucent material plate without blur, so content stays readable."],
+  ["Does it work with expo-video and react-native-video?", "Yes, on iOS and Android. Since 2.1.0 backdrop mode blurs a playing <code>expo-video</code> <code>VideoView</code> or <code>react-native-video</code> <code>&lt;Video&gt;</code> behind it with the default Android <code>SurfaceView</code>, in sync with the video, and content mode blurs the whole player. No <code>TextureView</code> is needed."],
 ];
 
 const pages = [
   {
     slug: "",
-    title: "React Native Blur: backdrop blur and frosted glass for React Native and Expo",
+    title: "React Native Blur: frosted glass, expo-video and react-native-video blur",
     nav: "Overview",
-    description: "Native blur view for React Native CLI and Expo on iOS, Android and Web. Frosted-glass headers, tab bars, cards and popups, Android video blur, and Android materials matched to iOS.",
+    description: "Native blur view for React Native CLI and Expo on iOS, Android 12+ and Web. Frosted-glass headers, tab bars, cards and popups, blur over expo-video and react-native-video, and Android materials matched to iOS.",
     h1: "React Native Blur",
-    lede: "Backdrop blur and frosted glass for React Native and Expo, on iOS and Android. Blur what is behind headers, tab bars, cards, popups and buttons while their content stays sharp, or blur a whole screen or a playing video.",
+    lede: "Backdrop blur and frosted glass for React Native and Expo, on iOS and Android. Blur what is behind headers, tab bars, cards, popups and buttons while their content stays sharp, or blur a whole screen or a playing video from expo-video or react-native-video.",
     body: `
 <figure>
   <img src="${ASSETS}blur-comparison.jpg" width="1520" height="784" alt="The same screen with no blur, this library on Android, this library on iOS, and expo-blur on Android" />
   <figcaption>The same screen four ways: no blur, this library on Android, this library on iOS, and a flat-tint blur on Android.</figcaption>
 </figure>
 
+<h2 id="whats-new">New in 2.1.0</h2>
+<ul>
+  <li><strong>Blur over <code>expo-video</code> and <code>react-native-video</code></strong>: backdrop mode blurs a playing video behind headers, controls and cards, in sync with it, with the default Android <code>SurfaceView</code>. Content mode blurs the whole player.</li>
+  <li><strong>Android 12 / 12L (API 31-32) fully supported</strong>, not only API 33+: no frozen backdrop while scrolling, no black video, faster video copies.</li>
+  <li>Backdrop inside <code>&lt;Modal&gt;</code> on Android, per-corner radii, any <code>tintColor</code>, <code>intensity</code> animated with Reanimated. See the <a href="${REPO}/blob/main/CHANGELOG.md">changelog</a>.</li>
+</ul>
+
 <h2 id="features">Features</h2>
 <ul>
   <li><strong>Backdrop blur</strong> (<code>mode="backdrop"</code>): frosted headers, tab bars, cards, popups and buttons that blur whatever is behind them, with sharp content on top. Works over scrolling lists and playing video.</li>
-  <li><strong>Blurs video on Android</strong>, including <code>SurfaceView</code> players such as <code>expo-video</code> and <code>react-native-video</code>.</li>
+  <li><strong>Blurs video from <code>expo-video</code> and <code>react-native-video</code></strong>, in backdrop and content mode, including their Android <code>SurfaceView</code> players.</li>
   <li><strong>Real iOS materials</strong>: <code>UIVisualEffectView</code> with the system blur styles.</li>
   <li><strong>Android matched to iOS</strong>: a <code>RenderEffect</code> blur plus colour matrix per material, calibrated against iOS screenshots (mean error 1.95 / 255 across 187 sampled colours).</li>
   <li><strong>One <code>intensity</code> prop</strong> from 0 to 100 drives blur, colour and glass rim together.</li>
@@ -235,10 +243,10 @@ ${code(`<Tab.Navigator
   },
   {
     slug: "android-video-blur/",
-    title: "Blur a playing video in React Native on Android (expo-video, react-native-video)",
+    title: "Blur expo-video and react-native-video in React Native (iOS, Android 12+)",
     nav: "Android video blur",
-    description: "Why expo-blur and @react-native-community/blur leave video sharp on Android, and how to blur expo-video or react-native-video SurfaceView playback in React Native.",
-    h1: "Blur a playing video in React Native on Android",
+    description: "Frosted glass over a playing expo-video or react-native-video player in React Native, on iOS and Android 12+ (API 31-32 included). Why expo-blur leaves video sharp on Android, and how to fix it.",
+    h1: "Blur expo-video and react-native-video in React Native",
     lede: "On Android, most blur libraries leave a playing video perfectly sharp behind the glass. This page explains why, and how to blur expo-video and react-native-video.",
     body: `
 <figure>
@@ -294,6 +302,8 @@ ${code(`<View style={{ flex: 1 }}>
 </ul>`,
     faq: [
       ["Why doesn't expo-blur blur my video on Android?", "Android video plays in a SurfaceView, which the system composites outside the app's view tree. View-based blurs never see it. This library copies SurfaceView frames with PixelCopy and blurs the copy."],
+      ["Does backdrop blur over video work on Android 12 (API 31-32)?", "Yes. Since 2.1.0 Android 12 / 12L has its own renderer: the blur follows the video, content mode no longer shows black, and video copies are half size and taken off the UI thread."],
+      ["Do I need a TextureView for backdrop blur over video?", "No. Since 2.1.0 the default <code>SurfaceView</code> works. A <code>TextureView</code> player (expo-video <code>surfaceType=\"textureView\"</code>, react-native-video <code>viewType={ViewType.TEXTURE}</code>) still works and needs no frame copy."],
       ["Does it work with react-native-video?", "Yes. Wrap the Video in a BlurView for content mode. Since 2.1.0 backdrop mode over the video also works with the default SurfaceView, so no TextureView is needed."],
       ...COMMON_FAQ,
     ],
@@ -435,6 +445,8 @@ ${INSTALL}`,
     <tr><td><code>borderTopLeftRadius</code> and other corners ignored</td><td>Only a uniform radius is applied</td><td>Per-corner radii clip the blur, tint and rim</td></tr>
     <tr><td>Backdrop freezes while scrolling on Android 12</td><td>Android 12 caches the blurred layer of a reused RenderNode</td><td>A fresh RenderNode per frame on API 31-32</td></tr>
     <tr><td>Blur strength changes after navigation or returning from background (iOS)</td><td>The paused animator behind <code>intensity</code> is reset</td><td>The effect is rebuilt when the view re-enters a window or the app returns to the foreground</td></tr>
+    <tr><td>Blurred video is black or frozen on Android 12 (API 31-32)</td><td>Android 12 handles hidden SurfaceViews and cached RenderNodes differently from API 33+</td><td>A separate API 31-32 renderer (2.1.0)</td></tr>
+    <tr><td>Backdrop blur over <code>expo-video</code> / <code>react-native-video</code> lags the video</td><td>The blurred copy and the live video come from different frames</td><td>The copy covers the live video so both match (<code>syncVideo</code>, 2.1.0)</td></tr>
     <tr><td>Android 11 and older show an unreadable overlay</td><td>No RenderEffect, and no fallback</td><td>A translucent plate in the material's colour</td></tr>
   </tbody>
 </table>

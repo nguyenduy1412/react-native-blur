@@ -2,6 +2,8 @@
 
 > Native blur view for React Native and Expo (iOS, Android, Web). On iOS it uses UIVisualEffectView with the system blur materials. On Android 12+ it rebuilds the same materials with a RenderEffect blur and colour-matrix chain calibrated against iOS, and it also blurs SurfaceView video (expo-video, react-native-video), which snapshot-based blur libraries cannot see.
 
+New in 2.1.0: backdrop blur over playing `expo-video` and `react-native-video` players with the default Android SurfaceView (no TextureView needed, in sync via `syncVideo`), and full Android 12 (API 31-32) support.
+
 Full reference: https://raw.githubusercontent.com/nguyenduy1412/react-native-blur/main/llms-full.txt
 Documentation site: https://nguyenduy1412.github.io/react-native-blur/
 
@@ -66,7 +68,7 @@ Blur a playing video:
 
 ## Requirements and limits
 
-- iOS 15.1+. Android API 31+ for the blur; older Android versions draw a translucent material plate without blur.
+- iOS 15.1+. Android API 31+ for the blur: Android 12 / 12L (API 31-32) gets the same blur and video blur as Android 13+ (API 33+) since 2.1.0; older Android versions draw a translucent material plate without blur.
 - Requires React Native 0.76+ with the New Architecture (Fabric component). Tested with React Native 0.86 in a plain React Native CLI app and in Expo SDK 57.
 - blurRadius and saturation are ignored on iOS.
 - Android video frames are copied with PixelCopy every frame at quarter resolution before blurring; the blurred video trails the real one by one or two frames.

@@ -1,7 +1,7 @@
 {
   "$schema": "https://context7.com/schema/context7.json",
   "projectTitle": "React Native Blur",
-  "description": "Native blur view for React Native and Expo that also blurs SurfaceView video on Android, with iOS system materials and Android RenderEffect materials matched to iOS.",
+  "description": "Native blur view for React Native and Expo. Frosted glass over expo-video and react-native-video (Android SurfaceView included), full Android 12 (API 31-32) support, iOS system materials and Android RenderEffect materials matched to iOS.",
   "excludeFolders": [
     "scripts",
     ".github",
@@ -10,8 +10,7 @@
     "build",
     "docs",
     "marketing",
-    "seo",
-    "example"
+    "seo"
   ],
   "rules": [
     "Import the default export: import BlurView from \"@nguyenduy1412/react-native-blur\".",
@@ -20,6 +19,9 @@
     "Use intensity 0 to disable the blur instead of unmounting the BlurView.",
     "The package contains native code and does not run in Expo Go; use a development build or EAS Build.",
     "Backdrop mode works inside <Modal transparent>; keep the modal root view transparent.",
-    "blurRadius and saturation only affect Android and Web."
+    "blurRadius and saturation only affect Android and Web.",
+    "Backdrop blur over a playing expo-video VideoView or react-native-video <Video> works with the default Android SurfaceView since 2.1.0; do not tell users to switch to TextureView.",
+    "syncVideo (Android, default true) keeps backdrop blur over a SurfaceView video in sync with it; set syncVideo={false} for a lighter copy that trails by 1-2 frames.",
+    "Android 12 / 12L (API 31-32) and Android 13+ get the same real blur and video blur; Android 11 and below get a translucent material plate."
   ]
 }
