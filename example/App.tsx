@@ -11,7 +11,10 @@ import {
   Text,
   TouchableOpacity,
   View,
+  requireNativeComponent,
   type ColorSchemeName,
+  type StyleProp,
+  type ViewStyle,
 } from 'react-native';
 import Animated, {
   useAnimatedProps,
@@ -22,6 +25,13 @@ import Video, { ViewType } from 'react-native-video';
 import BlurView, { type BlurTint } from '@nguyenduy1412/react-native-blur';
 
 const AnimatedBlurView = Animated.createAnimatedComponent(BlurView);
+
+// Android-only native TextureView video player (example/android/.../texturevideo).
+// react-native-video 6.19 always renders into a SurfaceView on Android.
+const TextureVideoView =
+  Platform.OS === 'android'
+    ? requireNativeComponent<{ paused?: boolean; style?: StyleProp<ViewStyle> }>('TextureVideoView')
+    : null;
 
 const VIDEO_SOURCE = Platform.select({
   ios: { uri: 'sample', type: 'mp4' },
@@ -77,9 +87,9 @@ export default function App() {
     Appearance.getColorScheme() ?? 'light'
   );
   const [modalVisible, setModalVisible] = useState(false);
-  const [animVal, setAnimVal] = useState(80);
+  const [animVal, setAnimVal] = useState(10);
 
-  const animatedIntensity = useSharedValue(80);
+  const animatedIntensity = useSharedValue(10);
   useEffect(() => {
     animatedIntensity.value = withTiming(animVal, { duration: 450 });
   }, [animVal, animatedIntensity]);
@@ -115,6 +125,13 @@ export default function App() {
         setVideo6Paused(true);
         setVideo7Paused(false);
       }
+      if (url.includes('play=9')) {
+        setPlayAll(false);
+        setVideo6Paused(true);
+        setVideo7Paused(true);
+        setVideo9Paused(false);
+      }
+      if (url.includes('play=7') || url.includes('play=8')) setVideo9Paused(true);
       if (url.includes('play=8')) {
         setPlayAll(true);
         setVideo6Paused(true);
@@ -157,14 +174,15 @@ export default function App() {
     };
   }, []);
 
-  const [videoBlurIntensity, setVideoBlurIntensity] = useState(20);
+  const [videoBlurIntensity, setVideoBlurIntensity] = useState(10);
   const [videoTint, setVideoTint] = useState<BlurTint>('systemMaterial');
   const [video6Paused, setVideo6Paused] = useState(true);
   const [video7Paused, setVideo7Paused] = useState(false);
   const [blurEffectMode, setBlurEffectMode] = useState<'split' | 'full' | 'sharp'>('split');
   const [playAll, setPlayAll] = useState(false);
-  const [intensity8, setIntensity8] = useState(60);
+  const [intensity8, setIntensity8] = useState(10);
   const [only8, setOnly8] = useState(false);
+  const [video9Paused, setVideo9Paused] = useState(false);
 
   const animatedProps = useAnimatedProps(() => ({
     intensity: animatedIntensity.value,
@@ -200,7 +218,7 @@ export default function App() {
           <ColorfulBackground height={120} count={3} label="Intro" />
           <BlurView
             mode="backdrop"
-            intensity={85}
+            intensity={10}
             tint="systemMaterial"
             style={styles.heroCard}
           >
@@ -223,7 +241,7 @@ export default function App() {
           <View style={styles.overlayCards}>
             <BlurView
               mode="backdrop"
-              intensity={80}
+              intensity={10}
               tint="systemUltraThinMaterial"
               style={styles.glassCard}
             >
@@ -233,7 +251,7 @@ export default function App() {
 
             <BlurView
               mode="backdrop"
-              intensity={80}
+              intensity={10}
               tint="systemThinMaterial"
               style={styles.glassCard}
             >
@@ -243,7 +261,7 @@ export default function App() {
 
             <BlurView
               mode="backdrop"
-              intensity={85}
+              intensity={10}
               tint="systemMaterial"
               style={styles.glassCard}
             >
@@ -253,7 +271,7 @@ export default function App() {
 
             <BlurView
               mode="backdrop"
-              intensity={90}
+              intensity={10}
               tint="systemThickMaterial"
               style={styles.glassCard}
             >
@@ -263,7 +281,7 @@ export default function App() {
 
             <BlurView
               mode="backdrop"
-              intensity={85}
+              intensity={10}
               tint="systemChromeMaterial"
               style={styles.glassCard}
             >
@@ -274,7 +292,7 @@ export default function App() {
             <View style={styles.rowTwo}>
               <BlurView
                 mode="backdrop"
-                intensity={80}
+                intensity={10}
                 tint="light"
                 style={[styles.glassCard, styles.half]}
               >
@@ -283,7 +301,7 @@ export default function App() {
               </BlurView>
               <BlurView
                 mode="backdrop"
-                intensity={80}
+                intensity={10}
                 tint="dark"
                 style={[styles.glassCard, styles.half]}
               >
@@ -304,7 +322,7 @@ export default function App() {
           <View style={styles.overlayCards}>
             <BlurView
               mode="backdrop"
-              intensity={75}
+              intensity={10}
               tint="systemMaterial"
               tintColor="rgba(255, 59, 48, 0.35)"
               style={styles.glassCard}
@@ -315,7 +333,7 @@ export default function App() {
 
             <BlurView
               mode="backdrop"
-              intensity={75}
+              intensity={10}
               tint="systemMaterial"
               tintColor="#00c7be60"
               style={styles.glassCard}
@@ -326,7 +344,7 @@ export default function App() {
 
             <BlurView
               mode="backdrop"
-              intensity={75}
+              intensity={10}
               tint="systemMaterial"
               tintColor="rgba(88, 86, 214, 0.45)"
               style={styles.glassCard}
@@ -347,7 +365,7 @@ export default function App() {
           <View style={styles.overlayCards}>
             <BlurView
               mode="backdrop"
-              intensity={85}
+              intensity={10}
               tint="systemThinMaterial"
               style={[
                 styles.glassCard,
@@ -365,7 +383,7 @@ export default function App() {
 
             <BlurView
               mode="backdrop"
-              intensity={85}
+              intensity={10}
               tint="systemThinMaterial"
               style={[styles.glassCard, { borderRadius: 36 }]}
             >
@@ -386,7 +404,7 @@ export default function App() {
             <Text style={styles.compareTitle}>Content Mode</Text>
             <BlurView
               mode="content"
-              intensity={65}
+              intensity={10}
               tint="systemMaterial"
               style={styles.compareBlur}
             >
@@ -410,7 +428,7 @@ export default function App() {
               <ColorfulBackground height={110} count={3} label="Under" />
               <BlurView
                 mode="backdrop"
-                intensity={85}
+                intensity={10}
                 tint="systemMaterial"
                 style={StyleSheet.absoluteFill}
               >
@@ -448,7 +466,7 @@ export default function App() {
                 Reanimated useAnimatedProps chuyển đổi mượt mà không khựng hình.
               </Text>
               <View style={styles.btnRow}>
-                {[20, 50, 80, 100].map((v) => (
+                {[10, 20, 50, 100].map((v) => (
                   <TouchableOpacity
                     key={v}
                     style={[
@@ -520,7 +538,7 @@ export default function App() {
               pointerEvents="none"
             >
               <View style={styles.splitTag}>
-                <Text style={styles.splitTagText}>TOÀN PHẦN KÍNH MỜ (100%)</Text>
+                <Text style={styles.splitTagText}>TOÀN PHẦN KÍNH MỜ (10%)</Text>
               </View>
             </BlurView>
           )}
@@ -536,7 +554,7 @@ export default function App() {
           {/* Floating Glass Control Card */}
           <BlurView
             mode="backdrop"
-            intensity={90}
+            intensity={10}
             tint="systemUltraThinMaterial"
             style={styles.videoFloatingCard}
           >
@@ -627,13 +645,13 @@ export default function App() {
           <Text style={styles.specsText}>• Tối ưu: 1 MediaCodec decoder, 60fps mượt mà không nóng máy</Text>
         </View>
 
-        {/* 7. LIVE VIDEO TRÊN SURFACEVIEW & TEXTVIEW (20% BLUR) */}
+        {/* 7. LIVE VIDEO TRÊN SURFACEVIEW & TEXTVIEW (10% BLUR) */}
         <SectionHeading
-          title="7. SurfaceView Video & TextView (20% Blur)"
-          subtitle="Video render trên Surface (viewType={ViewType.SURFACE}) cùng TextView, phủ kính mờ 20% cho cả 3 máy ảo"
+          title="7. SurfaceView Video & TextView (10% Blur)"
+          subtitle="Video render trên Surface (viewType={ViewType.SURFACE}) cùng TextView, phủ kính mờ 10% cho cả 3 máy ảo"
         />
 
-        {/* Card: SurfaceView Video + TextView (20% Blur) */}
+        {/* Card: SurfaceView Video + TextView (10% Blur) */}
         <View style={styles.surfaceVideoContainer}>
           <Video
             source={VIDEO_SOURCE}
@@ -652,14 +670,14 @@ export default function App() {
             </View>
             <Text style={styles.surfaceTitleText}>Mercedes-Benz Live Surface</Text>
             <Text style={styles.surfaceSubtitleText}>
-              Video render trên SurfaceView & TextView sibling phủ mờ 20%
+              Video render trên SurfaceView & TextView sibling phủ mờ 10%
             </Text>
           </View>
 
-          {/* Backdrop Blur Card (20% Blur Intensity) */}
+          {/* Backdrop Blur Card (10% Blur Intensity) */}
           <BlurView
             mode="backdrop"
-            intensity={20}
+            intensity={10}
             tint="systemMaterial"
             style={styles.surfaceBackdropCard}
           >
@@ -668,7 +686,7 @@ export default function App() {
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                   <View style={[styles.liveDot, video7Paused && styles.liveDotPaused]} />
                   <View style={styles.surfaceBlurTag}>
-                    <Text style={styles.surfaceBlurTagText}>20% BLUR INTENSITY</Text>
+                    <Text style={styles.surfaceBlurTagText}>10% BLUR INTENSITY</Text>
                   </View>
                 </View>
                 <TouchableOpacity
@@ -681,7 +699,7 @@ export default function App() {
                 </TouchableOpacity>
               </View>
               <Text style={styles.surfaceCardInnerTitle}>
-                Backdrop Kính Mờ 20%
+                Backdrop Kính Mờ 10%
               </Text>
               <Text style={styles.surfaceCardInnerDesc}>
                 PixelCopy mirror chụp SurfaceView + TextView mượt mà 60fps
@@ -693,7 +711,7 @@ export default function App() {
         {/* 8. CONTENT MODE OVER VIDEO */}
         <SectionHeading
           title="8. Content Mode: Blur the Video Itself"
-          subtitle="BlurView bọc video, intensity 60. Lưu ý: react-native-video 6.19 trên Android luôn dùng SurfaceView (viewType TEXTURE chưa được hỗ trợ); TextureView thật được test trong VideoTestActivity."
+          subtitle="BlurView bọc video, intensity 10. Lưu ý: react-native-video 6.19 trên Android luôn dùng SurfaceView (viewType TEXTURE chưa được hỗ trợ); TextureView thật được test trong VideoTestActivity."
         />
         <View style={{ flexDirection: 'row', gap: 12, paddingHorizontal: 16 }}>
           <BlurView intensity={intensity8} tint="systemMaterial" style={{ flex: 1, height: 180, borderRadius: 16 }}>
@@ -708,6 +726,43 @@ export default function App() {
           )}
         </View>
 
+        {/* 9. TEXTUREVIEW VIDEO (ANDROID) */}
+        <SectionHeading
+          title="9. TextureView Video (10% Blur)"
+          subtitle={
+            TextureVideoView
+              ? 'Video render bằng TextureView native (MediaPlayer), kính mờ backdrop 10% phía trên'
+              : 'Chỉ có trên Android (iOS không có TextureView)'
+          }
+        />
+        {TextureVideoView && (
+          <View style={styles.surfaceVideoContainer}>
+            <TextureVideoView paused={video9Paused} style={styles.videoPlayer} />
+            <View style={styles.surfaceTextOverlay} pointerEvents="none">
+              <View style={styles.surfaceBadge}>
+                <Text style={styles.surfaceBadgeText}>TEXTUREVIEW</Text>
+              </View>
+              <Text style={styles.surfaceTitleText}>Mercedes-Benz Live Texture</Text>
+            </View>
+            <BlurView mode="backdrop" intensity={10} tint="systemMaterial" style={styles.surfaceBackdropCard}>
+              <View style={styles.surfaceCardInner}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <View style={styles.surfaceBlurTag}>
+                    <Text style={styles.surfaceBlurTagText}>10% BLUR · TEXTUREVIEW</Text>
+                  </View>
+                  <TouchableOpacity style={styles.smallBtn} onPress={() => setVideo9Paused((p) => !p)}>
+                    <Text style={[styles.smallBtnText, { fontWeight: '700' }]}>
+                      {video9Paused ? '▶ Tiếp tục' : '⏸ Tạm dừng'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+                <Text style={styles.surfaceCardInnerTitle}>Backdrop Kính Mờ 10%</Text>
+                <Text style={styles.surfaceCardInnerDesc}>TextureView vẽ trực tiếp vào backdrop, không cần PixelCopy</Text>
+              </View>
+            </BlurView>
+          </View>
+        )}
+
         {/* Spacing for bottom floating bar */}
         <View style={{ height: 110 }} />
       </ScrollView>
@@ -715,7 +770,7 @@ export default function App() {
       {/* FIXED TOP HEADER (Backdrop Blur) */}
       <BlurView
         mode="backdrop"
-        intensity={90}
+        intensity={10}
         tint="systemMaterial"
         style={styles.topHeader}
       >
@@ -743,7 +798,7 @@ export default function App() {
       {/* FLOATING BOTTOM TAB BAR (Backdrop Blur) */}
       <BlurView
         mode="backdrop"
-        intensity={85}
+        intensity={10}
         tint="systemUltraThinMaterial"
         style={styles.bottomBar}
       >
@@ -768,7 +823,7 @@ export default function App() {
         <View style={styles.modalContainer}>
           <BlurView
             mode="backdrop"
-            intensity={80}
+            intensity={10}
             tint="dark"
             style={StyleSheet.absoluteFill}
           />
@@ -778,14 +833,14 @@ export default function App() {
           />
           <BlurView
             mode="backdrop"
-            intensity={90}
+            intensity={10}
             tint="systemMaterial"
             style={styles.modalCard}
           >
             <Text style={styles.modalTitle}>Full-Screen Glass Modal</Text>
             <Text style={styles.modalBody}>
               Toàn bộ màn hình scroll phía sau đang được làm mờ bởi lớp kính Backdrop
-              Blur 80%. Hộp thoại này là một thẻ kính mờ 90% (systemMaterial).
+              Blur 10%. Hộp thoại này là một thẻ kính mờ 10% (systemMaterial).
             </Text>
             <TouchableOpacity
               style={styles.modalCloseBtn}
