@@ -70,7 +70,7 @@ private const val WINDOW_MIRROR_DOWNSCALE = 2
 // A PixelCopy copy of a SurfaceView. In content mode it is shown in the
 // SurfaceView's overlay (inside the blurred subtree); in backdrop mode it is
 // drawn into the backdrop recording instead.
-private class SurfaceMirror(val view: SurfaceView, val inOverlay: Boolean) {
+internal class SurfaceMirror(val view: SurfaceView, val inOverlay: Boolean) {
     val frames = arrayOfNulls<BitmapDrawable>(2)
     var next = 0
     var shown: BitmapDrawable? = null
@@ -122,7 +122,6 @@ class BlurView(context: Context) : ReactViewGroup(context) {
     private var blurEffect: RenderEffect? = null
     private var appliedEffect: RenderEffect? = null
     private var backdropMode = false
-    private var backdropNode: RenderNode? = null
 
     // Backdrop inside another window (React Native <Modal>): the activity
     // window behind it is copied with PixelCopy and drawn under the siblings.
@@ -146,16 +145,13 @@ class BlurView(context: Context) : ReactViewGroup(context) {
         true
     }
 
-    // Android 12 (API 31-32) keeps the blurred layer of a view with a
-    // RenderEffect when only its children change, so a blurred video froze on
-    // its first (black) frame. There the content is recorded into a fresh
-    // RenderNode each frame instead, as in backdrop mode.
-    private val recordsContent =
-        Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU
+    // Version-specific drawing (API 33+ or 31-32); null below API 31, where
+    // there is no RenderEffect.
+    private val renderer = BlurRenderer.create()
 
-    // Ancestors of mirrored SurfaceViews that are drawn by hand (backdrop mode,
-    // and content mode on API 31-32). Drawing recurses into these instead of
-    // drawing them in one call, so the SurfaceViews can be replaced by copies.
+    // Ancestors of SurfaceViews behind a backdrop. The capture recurses into
+    // these instead of drawing them in one call, so the SurfaceViews can be
+    // replaced by their copies.
     private val surfaceAncestors = HashSet<View>()
     private val overlapRect = Rect()
     private val selfRect = Rect()
@@ -524,25 +520,7 @@ class BlurView(context: Context) : ReactViewGroup(context) {
 
     private fun syncSurfaceAlpha(mirror: SurfaceMirror) {
         if (!mirror.inOverlay) return
-        val shown = mirror.shown ?: return
-        if (appliedEffect == null) {
-            shown.alpha = 0
-            return
-        }
-        val view = mirror.view
-        // Hiding the SurfaceView (alpha 0) keeps its sharp video from showing
-        // through the blurred copy. On API 31-32 that also hides the overlay
-        // holding the copy, so the SurfaceView stays visible there; the copy
-        // drawn over it inside the blurred layer covers it.
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
-            shown.alpha = (view.alpha * 255).toInt()
-            return
-        }
-        if (mirror.ownerAlpha.isNaN() || view.alpha != 0f) {
-            mirror.ownerAlpha = view.alpha
-            view.alpha = 0f
-        }
-        shown.alpha = (mirror.ownerAlpha * 255).toInt()
+        renderer?.showSurfaceCopy(mirror, appliedEffect != null)
     }
 
     private fun overlapsOnScreen(view: View): Boolean =
@@ -677,7 +655,7 @@ class BlurView(context: Context) : ReactViewGroup(context) {
     }
 
     private fun applyEffects() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
+        if (renderer == null) {
             updateFallbackPlate()
             return
         }
@@ -715,10 +693,10 @@ class BlurView(context: Context) : ReactViewGroup(context) {
     }
 
     private fun applyChildEffects() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return
+        val renderer = renderer ?: return
         val waitingForMirror = appliedEffect == null && surfaceMirrors.values.any { !it.ready }
         appliedEffect = if (backdropMode || waitingForMirror) null else blurEffect
-        blurContent.setRenderEffect(if (recordsContent) null else appliedEffect)
+        renderer.applyContentEffect(blurContent, appliedEffect)
     }
 
     override fun dispatchDraw(canvas: Canvas) {
@@ -727,8 +705,16 @@ class BlurView(context: Context) : ReactViewGroup(context) {
             drawTint(canvas)
             super.dispatchDraw(canvas)
         } else {
-            val effect = appliedEffect
-            if (recordsContent && effect != null) drawContentNode(canvas, effect) else super.dispatchDraw(canvas)
+            val renderer = renderer
+            if (renderer == null) {
+                super.dispatchDraw(canvas)
+            } else {
+                renderer.drawContent(
+                    canvas, width, height, appliedEffect,
+                    record = { recording -> drawChild(recording, blurContent, drawingTime) },
+                    drawDefault = { drawChildren(canvas) },
+                )
+            }
             drawTint(canvas)
         }
 
@@ -737,22 +723,10 @@ class BlurView(context: Context) : ReactViewGroup(context) {
         }
     }
 
-    private fun drawContentNode(canvas: Canvas, effect: RenderEffect) {
-        if (!canvas.isHardwareAccelerated || width <= 0 || height <= 0) return super.dispatchDraw(canvas)
-        val node = RenderNode("blurContent")
-        node.setPosition(0, 0, width, height)
-        val recording = node.beginRecording(width, height)
-        try {
-            if (blurContent in surfaceAncestors) drawCaptured(recording, blurContent) else drawChild(recording, blurContent, drawingTime)
-        } finally {
-            node.endRecording()
-        }
-        node.setRenderEffect(effect)
-        canvas.drawRenderNode(node)
-    }
+    private fun drawChildren(canvas: Canvas) = super.dispatchDraw(canvas)
 
     private fun drawTint(canvas: Canvas) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S && Color.alpha(fallbackPaint.color) > 0) {
+        if (renderer == null && Color.alpha(fallbackPaint.color) > 0) {
             canvas.drawPath(cornerPath, fallbackPaint)
         }
         if (Color.alpha(tintPaint.color) > 0) {
@@ -761,21 +735,14 @@ class BlurView(context: Context) : ReactViewGroup(context) {
     }
 
     private fun drawBackdrop(canvas: Canvas) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return
+        val renderer = renderer ?: return
         // A BlurView drawn inside another BlurView's backdrop capture does not
         // capture its own backdrop: that would re-run every nested capture and
         // grows exponentially with the number of overlapping BlurViews.
         if (captureDepth > 0) return
         val effect = blurEffect ?: return
         if (!canvas.isHardwareAccelerated || width <= 0 || height <= 0) return
-        // Android 12 (API 31-32) keeps the blurred layer of a reused RenderNode
-        // when only its display list changes, so the backdrop froze while
-        // scrolling. Use a fresh node per frame there.
-        val node = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            backdropNode ?: RenderNode("blurBackdrop").also { backdropNode = it }
-        } else {
-            RenderNode("blurBackdrop")
-        }
+        val node = renderer.backdropNode()
         node.setPosition(0, 0, width, height)
         val recording = node.beginRecording(width, height)
         captureDepth++
