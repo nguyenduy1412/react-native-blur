@@ -301,7 +301,7 @@ Accepts every `View` prop, plus:
 - **Video copies on Android** are made at quarter resolution, as fast as `PixelCopy` returns them (usually the video's own frame rate). The blurred video trails the real one by one or two frames, which you can notice where sharp and blurred video sit side by side.
 - **Colour fidelity:** Android fits each iOS luminance curve with a single colour matrix, so it averages about 2 / 255 off iOS. `systemChromeMaterial` is the outlier, at up to about 23 / 255.
 - **Backdrop inside `<Modal>` on Android** copies the screen behind the modal with `PixelCopy` at about 30 fps and half resolution, then blurs it.
-- **`SurfaceView` behind a backdrop on Android** (video, maps) is copied with `PixelCopy` every frame at quarter resolution, then blurred.
+- **`SurfaceView` behind a backdrop on Android** (video, maps) is copied with `PixelCopy` every frame at full resolution. The copy covers the live video, so the sharp part around the `BlurView` and the blurred part behind it come from the same frame; the video as a whole runs one or two frames behind its audio. A `TextureView` player has no such delay.
 
 ## FAQ
 

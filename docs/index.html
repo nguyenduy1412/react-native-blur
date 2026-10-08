@@ -165,7 +165,7 @@ npx expo run:android</code></pre>
   <li>Android 11 and below have no <code>RenderEffect</code>, so they draw a translucent material plate instead of a blur.</li>
   <li><code>blurRadius</code> and <code>saturation</code> are ignored on iOS.</li>
   <li>Backdrop inside <code>&lt;Modal&gt;</code> on Android copies the screen behind with <code>PixelCopy</code> at about 30 fps, half resolution.</li>
-  <li>A <code>SurfaceView</code> behind a backdrop on Android (video, maps) is copied with <code>PixelCopy</code> every frame, quarter resolution.</li>
+  <li>A <code>SurfaceView</code> behind a backdrop on Android (video, maps) is copied with <code>PixelCopy</code> every frame at full resolution. The copy covers the live video so the sharp and blurred parts stay in sync; a <code>TextureView</code> player has no delay at all.</li>
 </ul>
 <h2 id="faq">FAQ</h2>
 <details><summary>How do I make a frosted header, tab bar or button in React Native?</summary><p>Use <code>&lt;BlurView mode="backdrop"&gt;</code>. The content behind the view is blurred and its children stay sharp, on both iOS and Android.</p></details>

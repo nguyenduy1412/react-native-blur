@@ -67,10 +67,12 @@ private const val SURFACE_MIRROR_DOWNSCALE = 4
 private const val WINDOW_MIRROR_INTERVAL_NANOS = 33_000_000L
 private const val WINDOW_MIRROR_DOWNSCALE = 2
 
-// A PixelCopy copy of a SurfaceView. In content mode it is shown in the
-// SurfaceView's overlay (inside the blurred subtree); in backdrop mode it is
-// drawn into the backdrop recording instead.
-internal class SurfaceMirror(val view: SurfaceView, val inOverlay: Boolean) {
+// A PixelCopy copy of a SurfaceView, shown in the SurfaceView's overlay.
+// Content mode: a quarter-size copy that the content blur blurs in place.
+// Backdrop mode: a full-size copy that covers the live video, so the sharp
+// video around the BlurView and the blurred copy behind it come from the
+// same frame instead of the copy trailing the live video.
+internal class SurfaceMirror(val view: SurfaceView, val forContent: Boolean) {
     val frames = arrayOfNulls<BitmapDrawable>(2)
     var next = 0
     var shown: BitmapDrawable? = null
@@ -325,14 +327,14 @@ class BlurView(context: Context) : ReactViewGroup(context) {
             backdropMode -> collectBackdropSurfaceViews()
             else -> collectSurfaceViews(this, mutableListOf())
         }
-        val inOverlay = !backdropMode
-        if (!inOverlay) addSurfaceAncestors(found)
+        val forContent = !backdropMode
+        if (!forContent) addSurfaceAncestors(found)
         (surfaceMirrors.keys - found.toSet()).forEach(::releaseMirror)
-        surfaceMirrors.values.filter { it.inOverlay != inOverlay }.map { it.view }.forEach(::releaseMirror)
+        surfaceMirrors.values.filter { it.forContent != forContent }.map { it.view }.forEach(::releaseMirror)
         found.forEach { surface ->
             surfaceMirrors.getOrPut(surface) {
                 mirrorSubscribers.getOrPut(surface) { HashSet() }.add(this)
-                SurfaceMirror(surface, inOverlay)
+                SurfaceMirror(surface, forContent)
             }
         }
         updateMirrorLoop()
@@ -461,15 +463,20 @@ class BlurView(context: Context) : ReactViewGroup(context) {
         // Copies are only needed while they can be seen: a content-mode
         // BlurView must be on screen, and a backdrop SurfaceView must be
         // behind this view right now.
-        if (mirror.inOverlay) {
+        if (mirror.forContent) {
             if (!getGlobalVisibleRect(selfRect)) return
         } else if (!overlapsOnScreen(view)) {
+            // Uncover the live video while it is not behind this view.
+            hideMirror(mirror)
             return
         }
+        // A copy that covers the live video must be full size; one that is
+        // only ever blurred can be a quarter of it.
+        val downscale = if (mirrorSubscribers[view]?.any { it.backdropMode } == true) 1 else SURFACE_MIRROR_DOWNSCALE
         val frame = mirrorFrameBuffer(
             mirror,
-            (view.width / SURFACE_MIRROR_DOWNSCALE).coerceAtLeast(1),
-            (view.height / SURFACE_MIRROR_DOWNSCALE).coerceAtLeast(1)
+            (view.width / downscale).coerceAtLeast(1),
+            (view.height / downscale).coerceAtLeast(1)
         )
         if (!copiesInFlight.add(view)) return
         mirror.copying = true
@@ -496,11 +503,7 @@ class BlurView(context: Context) : ReactViewGroup(context) {
     private fun receiveSharedFrame(view: SurfaceView, frame: BitmapDrawable) {
         val mirror = surfaceMirrors[view] ?: return
         mirror.ready = true
-        if (mirror.inOverlay) {
-            showMirror(mirror, frame)
-        } else {
-            mirror.shown = frame
-        }
+        showMirror(mirror, frame)
         invalidate()
     }
 
@@ -515,17 +518,30 @@ class BlurView(context: Context) : ReactViewGroup(context) {
 
     private fun showMirror(mirror: SurfaceMirror, frame: BitmapDrawable) {
         frame.setBounds(0, 0, mirror.view.width, mirror.view.height)
-        if (mirror.inOverlay) {
-            val overlay = mirror.view.overlay
-            mirror.shown?.let { if (it !== frame) overlay.remove(it) }
-            if (mirror.shown !== frame) overlay.add(frame) else mirror.view.invalidate()
-        }
+        val overlay = mirror.view.overlay
+        mirror.shown?.let { if (it !== frame) overlay.remove(it) }
+        overlay.add(frame) // no-op when already added
+        mirror.view.invalidate()
         mirror.shown = frame
         mirror.next = 1 - mirror.next
+        if (!mirror.forContent) frame.alpha = (mirror.view.alpha * 255).toInt()
+    }
+
+    // Uncovers the live video, unless another BlurView still shows the copy.
+    private fun hideMirror(mirror: SurfaceMirror) {
+        val view = mirror.view
+        val stillShown = mirrorSubscribers[view]?.any { it !== this && it.showsCopyOf(view) } == true
+        if (!stillShown) mirror.shown?.let { view.overlay.remove(it) }
+        mirror.shown = null
+    }
+
+    private fun showsCopyOf(view: SurfaceView): Boolean {
+        val mirror = surfaceMirrors[view] ?: return false
+        return if (mirror.forContent) getGlobalVisibleRect(selfRect) else overlapsOnScreen(view)
     }
 
     private fun syncSurfaceAlpha(mirror: SurfaceMirror) {
-        if (!mirror.inOverlay) return
+        if (!mirror.forContent) return
         renderer?.showSurfaceCopy(mirror, appliedEffect != null)
     }
 
@@ -539,7 +555,7 @@ class BlurView(context: Context) : ReactViewGroup(context) {
             subscribers.remove(this)
             if (subscribers.isEmpty()) mirrorSubscribers.remove(view)
         }
-        if (mirror.inOverlay) mirror.shown?.let { view.overlay.remove(it) }
+        mirror.shown?.let { view.overlay.remove(it) }
         mirror.shown = null
         if (!mirror.ownerAlpha.isNaN()) view.alpha = mirror.ownerAlpha
     }
