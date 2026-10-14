@@ -1,5 +1,8 @@
-# Deploy this file at https://kaizer-app.vercel.app/robots.txt
-# It intentionally permits search and AI-search crawlers to discover the public library documentation.
+# https://kaizer-app.vercel.app/robots.txt
+# Portfolio only. The library docs live at https://nguyenduy1412.github.io/react-native-blur/
+
+User-agent: *
+Allow: /
 
 User-agent: Googlebot
 Allow: /
@@ -10,13 +13,25 @@ Allow: /
 User-agent: OAI-SearchBot
 Allow: /
 
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: GPTBot
+Allow: /
+
 User-agent: Claude-SearchBot
 Allow: /
 
 User-agent: Claude-User
 Allow: /
 
-User-agent: *
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+User-agent: Applebot
 Allow: /
 
 Sitemap: https://kaizer-app.vercel.app/sitemap.xml

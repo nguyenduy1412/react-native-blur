@@ -24,7 +24,19 @@ const TODAY = new Date().toISOString().slice(0, 10);
 
 const esc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 const code = (src, lang = "tsx") => `<pre><code class="language-${lang}">${esc(src.trim())}</code></pre>`;
-const stripTags = (s) => s.replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
+const PUBLISHED = "2026-10-03";
+const OG_WIDTH = 1200;
+const OG_HEIGHT = 630;
+const plainText = (s) =>
+  s
+    .replace(/<[^>]+>/g, "")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;|&apos;/g, "'")
+    .replace(/&amp;/g, "&")
+    .replace(/\s+/g, " ")
+    .trim();
 
 const INSTALL = `<h3>React Native CLI</h3>
 ${code(`npm install ${PKG}\ncd ios && pod install`, "sh")}
@@ -524,6 +536,9 @@ function render(page) {
       version: pkg.version,
       keywords: pkg.keywords.join(", "),
       url: SITE,
+      image: SITE + "og.png",
+      datePublished: PUBLISHED,
+      dateModified: TODAY,
       sameAs: [REPO, NPM],
       author: { "@type": "Person", name: "nguyenduy1412", url: "https://github.com/nguyenduy1412" },
     },
@@ -532,6 +547,8 @@ function render(page) {
       headline: page.title,
       description: page.description,
       url,
+      image: SITE + "og.png",
+      datePublished: PUBLISHED,
       dateModified: TODAY,
       inLanguage: "en",
       about: { "@id": SITE + "#software" },
@@ -542,7 +559,7 @@ function render(page) {
       mainEntity: page.faq.map(([q, a]) => ({
         "@type": "Question",
         name: q,
-        acceptedAnswer: { "@type": "Answer", text: stripTags(a) },
+        acceptedAnswer: { "@type": "Answer", text: plainText(a) },
       })),
     },
   ];
@@ -564,10 +581,12 @@ function render(page) {
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>${esc(page.title)}</title>
 <meta name="description" content="${esc(page.description)}" />
-<meta name="keywords" content="${esc(pkg.keywords.join(", "))}" />
 <meta name="robots" content="index,follow,max-image-preview:large" />
 <link rel="canonical" href="${url}" />
 <link rel="alternate" type="text/plain" title="llms.txt" href="${SITE}llms.txt" />
+<link rel="icon" href="${SITE}favicon.ico" sizes="48x48" />
+<link rel="icon" href="${SITE}favicon.svg" type="image/svg+xml" />
+<link rel="apple-touch-icon" href="${SITE}apple-touch-icon.png" />
 <meta name="theme-color" content="#0b0d12" />
 <meta property="og:type" content="article" />
 <meta property="og:site_name" content="React Native Blur" />
@@ -575,13 +594,15 @@ function render(page) {
 <meta property="og:description" content="${esc(page.description)}" />
 <meta property="og:url" content="${url}" />
 <meta property="og:image" content="${SITE}og.png" />
-<meta property="og:image:width" content="1280" />
-<meta property="og:image:height" content="640" />
+<meta property="og:image:type" content="image/png" />
+<meta property="og:image:width" content="${OG_WIDTH}" />
+<meta property="og:image:height" content="${OG_HEIGHT}" />
 <meta property="og:image:alt" content="React Native Blur: frosted glass for iOS and Android" />
 <meta name="twitter:card" content="summary_large_image" />
 <meta name="twitter:title" content="${esc(page.title)}" />
 <meta name="twitter:description" content="${esc(page.description)}" />
 <meta name="twitter:image" content="${SITE}og.png" />
+<meta name="twitter:image:alt" content="React Native Blur: frosted glass for iOS and Android" />
 <script type="application/ld+json">${jsonLd}</script>
 <style>${CSS}</style>
 </head>
@@ -621,5 +642,44 @@ for (const f of ["llms.txt", "llms-full.txt"]) {
   fs.copyFileSync(path.join(root, f), path.join(out, f));
 }
 fs.writeFileSync(path.join(out, ".nojekyll"), "");
+fs.writeFileSync(
+  path.join(out, "robots.txt"),
+  `# ${SITE}robots.txt
+User-agent: *
+Allow: /
+
+User-agent: Googlebot
+Allow: /
+
+User-agent: Bingbot
+Allow: /
+
+User-agent: OAI-SearchBot
+Allow: /
+
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: GPTBot
+Allow: /
+
+User-agent: Claude-SearchBot
+Allow: /
+
+User-agent: Claude-User
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+User-agent: Applebot
+Allow: /
+
+Sitemap: ${SITE}sitemap.xml
+`,
+);
 
 console.log(`Built ${pages.length} pages into docs/`);
