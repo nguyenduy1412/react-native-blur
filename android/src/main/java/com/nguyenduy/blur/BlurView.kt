@@ -197,7 +197,7 @@ class BlurView(context: Context) : ReactViewGroup(context) {
             val now = SystemClock.uptimeMillis()
             if (renderer == null && now - lastSoftwareFrame < 33L) return@Runnable
             lastSoftwareFrame = now
-            invalidate()
+            backdropView.invalidate()
         }
     }
 
@@ -281,8 +281,23 @@ class BlurView(context: Context) : ReactViewGroup(context) {
 
     val blurContent = BlurContentView(context) { applyEffects() }
 
+    // Draws the backdrop (and the tint over it) under the content. It is a
+    // child of its own so that re-capturing the backdrop only re-records this
+    // node: re-recording the whole BlurView while a screen transition runs
+    // made Android drop the screen's display list (a white flash).
+    private val backdropView = BackdropView(context)
+
+    private inner class BackdropView(context: Context) : View(context) {
+        override fun onDraw(canvas: Canvas) {
+            if (!backdropMode) return
+            drawBackdrop(canvas)
+            drawTint(canvas)
+        }
+    }
+
     init {
         setWillNotDraw(false)
+        addView(backdropView, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
         addView(blurContent, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
         updateOutline()
         updateShaders()
@@ -383,20 +398,23 @@ class BlurView(context: Context) : ReactViewGroup(context) {
         } else {
             setMeasuredDimension(MeasureSpec.getSize(widthMeasureSpec), MeasureSpec.getSize(heightMeasureSpec))
         }
-        blurContent.measure(
-            MeasureSpec.makeMeasureSpec(measuredWidth, MeasureSpec.EXACTLY),
-            MeasureSpec.makeMeasureSpec(measuredHeight, MeasureSpec.EXACTLY)
-        )
+        val exactWidth = MeasureSpec.makeMeasureSpec(measuredWidth, MeasureSpec.EXACTLY)
+        val exactHeight = MeasureSpec.makeMeasureSpec(measuredHeight, MeasureSpec.EXACTLY)
+        backdropView.measure(exactWidth, exactHeight)
+        blurContent.measure(exactWidth, exactHeight)
     }
 
     override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
         super.onLayout(changed, left, top, right, bottom)
+        backdropView.layout(0, 0, right - left, bottom - top)
         blurContent.layout(0, 0, right - left, bottom - top)
     }
 
     override fun onDescendantInvalidated(child: View, target: View) {
         super.onDescendantInvalidated(child, target)
-        if (blurEffect != null) invalidate()
+        // In backdrop mode the children are drawn above the blurred plate, so
+        // their changes do not change the capture.
+        if (!backdropMode && blurActive) invalidate()
     }
 
     override fun onAttachedToWindow() {
@@ -697,6 +715,7 @@ class BlurView(context: Context) : ReactViewGroup(context) {
         settledBackdrop = null
         softwareBitmap = null
         softwareCanvas = null
+        backdropView.invalidate()
         if (hasCorners) {
             invalidateOutline()
         }
@@ -742,6 +761,7 @@ class BlurView(context: Context) : ReactViewGroup(context) {
     }
 
     private fun updateShaders() {
+        backdropView.invalidate()
         val w = width.toFloat()
         val h = height.toFloat()
         if (w <= 0f || h <= 0f) return
@@ -839,6 +859,7 @@ class BlurView(context: Context) : ReactViewGroup(context) {
             updateFallbackPlate()
             syncSurfaceMirrors()
             syncWindowMirror()
+            backdropView.invalidate()
             return
         }
 
@@ -858,6 +879,7 @@ class BlurView(context: Context) : ReactViewGroup(context) {
         syncSurfaceMirrors()
         syncWindowMirror()
         applyChildEffects()
+        backdropView.invalidate()
     }
 
     // Used when there is no blur to draw on API 30 and below (the blur is off
@@ -888,8 +910,7 @@ class BlurView(context: Context) : ReactViewGroup(context) {
 
     override fun dispatchDraw(canvas: Canvas) {
         if (backdropMode) {
-            drawBackdrop(canvas)
-            drawTint(canvas)
+            // backdropView (backdrop and tint), then the content.
             super.dispatchDraw(canvas)
         } else {
             val renderer = renderer
