@@ -25,6 +25,7 @@ import android.os.SystemClock
 import android.view.Choreographer
 import android.view.PixelCopy
 import android.view.SurfaceView
+import android.view.TextureView
 import android.view.View
 import android.view.ViewGroup
 import android.view.ViewOutlineProvider
@@ -153,6 +154,9 @@ class BlurView(context: Context) : ReactViewGroup(context) {
     private var lastSoftwareFrame = 0L
     private val softwarePaint = Paint(Paint.FILTER_BITMAP_FLAG)
     private val softwareDest = RectF()
+    private var textureBitmap: Bitmap? = null
+    private val texturePaint = Paint(Paint.FILTER_BITMAP_FLAG)
+    private val textureDest = RectF()
     private var backdropMode = false
     private var syncVideo = true
 
@@ -197,10 +201,13 @@ class BlurView(context: Context) : ReactViewGroup(context) {
         }
     }
 
-    // Whether there is a backdrop to capture: a RenderEffect on API 31+, a CPU
-    // blur below it.
+    // Whether a blur is drawn: a RenderEffect on API 31+, a CPU blur below it.
+    private val blurActive: Boolean
+        get() = blurEffect != null || softwareRadius > 0.5f
+
+    // Whether there is a backdrop to capture.
     private val hasBackdrop: Boolean
-        get() = backdropMode && (blurEffect != null || softwareRadius > 0.5f)
+        get() = backdropMode && blurActive
 
     // True while a screen transition animates the window. React Native Screens
     // starts a view animation on the root view of each fragment, which is in a
@@ -416,7 +423,7 @@ class BlurView(context: Context) : ReactViewGroup(context) {
     private fun syncSurfaceMirrors() {
         surfaceAncestors.clear()
         val found = when {
-            blurEffect == null || !isAttachedToWindow -> emptyList()
+            !blurActive || !isAttachedToWindow -> emptyList()
             backdropMode -> collectBackdropSurfaceViews()
             else -> collectSurfaceViews(this, mutableListOf())
         }
@@ -1012,7 +1019,7 @@ class BlurView(context: Context) : ReactViewGroup(context) {
         bitmapCanvas.scale(1f / SOFTWARE_DOWNSCALE, 1f / SOFTWARE_DOWNSCALE)
         captureDepth++
         try {
-            captureBackdrop(bitmapCanvas)
+            captureBackdrop(bitmapCanvas, software = true)
         } finally {
             captureDepth--
             bitmapCanvas.restoreToCount(saved)
@@ -1030,7 +1037,7 @@ class BlurView(context: Context) : ReactViewGroup(context) {
         val saved = bitmapCanvas.save()
         bitmapCanvas.scale(1f / SOFTWARE_DOWNSCALE, 1f / SOFTWARE_DOWNSCALE)
         try {
-            drawChild(bitmapCanvas, blurContent, drawingTime)
+            drawCaptured(bitmapCanvas, blurContent, software = true)
         } finally {
             bitmapCanvas.restoreToCount(saved)
         }
@@ -1095,7 +1102,7 @@ class BlurView(context: Context) : ReactViewGroup(context) {
         }
     }
 
-    private fun captureBackdrop(canvas: Canvas) {
+    private fun captureBackdrop(canvas: Canvas, software: Boolean = false) {
         var child: View = this
         var parent = child.parent as? ViewGroup
         var offsetX = 0f
@@ -1126,7 +1133,7 @@ class BlurView(context: Context) : ReactViewGroup(context) {
                 canvas.translate(sibling.left - offset[0], sibling.top - offset[1])
                 if (!sibling.matrix.isIdentity) canvas.concat(sibling.matrix)
                 canvas.translate(-sibling.scrollX.toFloat(), -sibling.scrollY.toFloat())
-                drawCaptured(canvas, sibling)
+                drawCaptured(canvas, sibling, software)
                 canvas.restoreToCount(saved)
             }
         }
@@ -1135,13 +1142,16 @@ class BlurView(context: Context) : ReactViewGroup(context) {
     // Draws a view into the backdrop recording. The canvas is already at the
     // view's position with its scroll applied. SurfaceViews are replaced by
     // their PixelCopy copy; views that contain one are drawn child by child.
-    private fun drawCaptured(canvas: Canvas, view: View) {
+    private fun drawCaptured(canvas: Canvas, view: View, software: Boolean = false) {
         when {
             view is SurfaceView -> surfaceMirrors[view]?.shown?.let { frame ->
                 frame.alpha = (view.alpha * 255).toInt()
                 frame.draw(canvas)
             }
-            view is ViewGroup && view in surfaceAncestors -> {
+            // A TextureView is drawn by the GPU: a software canvas gets nothing
+            // from it, so its content is copied into a bitmap first.
+            software && view is TextureView -> drawTexture(canvas, view)
+            view is ViewGroup && (software || view in surfaceAncestors) -> {
                 view.background?.let { background ->
                     background.setBounds(0, 0, view.width, view.height)
                     background.draw(canvas)
@@ -1153,12 +1163,24 @@ class BlurView(context: Context) : ReactViewGroup(context) {
                     canvas.translate(child.left.toFloat(), child.top.toFloat())
                     if (!child.matrix.isIdentity) canvas.concat(child.matrix)
                     canvas.translate(-child.scrollX.toFloat(), -child.scrollY.toFloat())
-                    drawCaptured(canvas, child)
+                    drawCaptured(canvas, child, software)
                     canvas.restoreToCount(saved)
                 }
             }
             else -> view.draw(canvas)
         }
+    }
+
+    // Draws the current frame of a TextureView, at half its size to keep the
+    // copy cheap.
+    private fun drawTexture(canvas: Canvas, view: TextureView) {
+        val w = (view.width / 2).coerceAtLeast(1)
+        val h = (view.height / 2).coerceAtLeast(1)
+        val bitmap = textureBitmap?.takeIf { it.width == w && it.height == h }
+            ?: Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888).also { textureBitmap = it }
+        if (view.getBitmap(bitmap) == null) return
+        textureDest.set(0f, 0f, view.width.toFloat(), view.height.toFloat())
+        canvas.drawBitmap(bitmap, null, textureDest, texturePaint)
     }
 }
 
