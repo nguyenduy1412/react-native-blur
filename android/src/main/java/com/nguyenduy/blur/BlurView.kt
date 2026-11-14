@@ -119,6 +119,11 @@ class BlurView(context: Context) : ReactViewGroup(context) {
         val copyHandler: Handler by lazy {
             Handler(HandlerThread("BlurViewPixelCopy").apply { start() }.looper)
         }
+
+        // API 30 and below have no RenderEffect, so the backdrop is captured
+        // into a bitmap this many times smaller than the view and blurred on
+        // the CPU. The blur is cheap at this size and upscaling hides it.
+        const val SOFTWARE_DOWNSCALE = 8
     }
 
     private val density = context.resources.displayMetrics.density
@@ -136,6 +141,16 @@ class BlurView(context: Context) : ReactViewGroup(context) {
     private var nightMode = isNight(resources.configuration)
     private var blurEffect: RenderEffect? = null
     private var appliedEffect: RenderEffect? = null
+
+    // API 30 and below: the backdrop is drawn into this bitmap, blurred and
+    // scaled back up.
+    private var softwareBitmap: Bitmap? = null
+    private var softwareCanvas: Canvas? = null
+    private var softwareRadius = 0f
+    private var softwareFilter: ColorMatrixColorFilter? = null
+    private var softwareDrawn = false
+    private val softwarePaint = Paint(Paint.FILTER_BITMAP_FLAG)
+    private val softwareDest = RectF()
     private var backdropMode = false
     private var syncVideo = true
 
@@ -157,7 +172,7 @@ class BlurView(context: Context) : ReactViewGroup(context) {
         surfaceMirrors.values.forEach(::syncSurfaceAlpha)
         // Re-capture the backdrop every frame, but only while this view is on
         // screen; a long list can hold many BlurViews that are scrolled away.
-        if (backdropMode && blurEffect != null && getGlobalVisibleRect(selfRect)) {
+        if (hasBackdrop && getGlobalVisibleRect(selfRect)) {
             postOnAnimation(backdropInvalidate)
         }
         true
@@ -169,10 +184,15 @@ class BlurView(context: Context) : ReactViewGroup(context) {
     // draw the window background for a frame (a white flash), and the backdrop
     // captured mid-transition came out white.
     private val backdropInvalidate = Runnable {
-        if (backdropMode && blurEffect != null && getGlobalVisibleRect(selfRect) && !isScreenTransitioning()) {
+        if (hasBackdrop && getGlobalVisibleRect(selfRect) && !isScreenTransitioning()) {
             invalidate()
         }
     }
+
+    // Whether there is a backdrop to capture: a RenderEffect on API 31+, a CPU
+    // blur below it.
+    private val hasBackdrop: Boolean
+        get() = backdropMode && (blurEffect != null || softwareRadius > 0.5f)
 
     // True while a screen transition animates the window. React Native Screens
     // starts a view animation on the root view of each fragment, which is in a
@@ -442,7 +462,7 @@ class BlurView(context: Context) : ReactViewGroup(context) {
     private fun activityWindow() = ((context as? ReactContext)?.currentActivity)?.window
 
     private fun needsWindowMirror(): Boolean {
-        if (!backdropMode || blurEffect == null || !isAttachedToWindow) return false
+        if (!hasBackdrop || !isAttachedToWindow) return false
         val window = activityWindow() ?: return false
         return rootView !== window.decorView
     }
@@ -660,6 +680,8 @@ class BlurView(context: Context) : ReactViewGroup(context) {
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
         settledBackdrop = null
+        softwareBitmap = null
+        softwareCanvas = null
         if (hasCorners) {
             invalidateOutline()
         }
@@ -747,7 +769,9 @@ class BlurView(context: Context) : ReactViewGroup(context) {
     private fun recipe(key: String, night: Boolean) =
         (if (night) DARK_MATERIALS else LIGHT_MATERIALS).getValue(key)
 
-    private fun materialColorEffect(material: Material, fraction: Float): RenderEffect {
+    // The material as two colour matrices: the saturation boost applied first,
+    // then the luminance plate.
+    private fun materialMatrices(material: Material, fraction: Float): Pair<ColorMatrix, ColorMatrix> {
         val amount = material.luminanceAmount * fraction
         val (slope, intercept) = luminancePlateLine(material.luminanceValues)
         val backdrop = 1f - amount
@@ -764,6 +788,11 @@ class BlurView(context: Context) : ReactViewGroup(context) {
                 0f, 0f, 0f, 1f, 0f
             )
         )
+        return saturation to plateMatrix
+    }
+
+    private fun materialColorEffect(material: Material, fraction: Float): RenderEffect {
+        val (saturation, plateMatrix) = materialMatrices(material, fraction)
         if (!material.clampsBetweenStages) {
             saturation.postConcat(plateMatrix)
             return RenderEffect.createColorFilterEffect(ColorMatrixColorFilter(saturation))
@@ -774,9 +803,27 @@ class BlurView(context: Context) : ReactViewGroup(context) {
         )
     }
 
+    // The same material as a single filter, for the CPU blur below API 31.
+    private fun materialColorMatrix(material: Material, fraction: Float): ColorMatrix {
+        val (saturation, plateMatrix) = materialMatrices(material, fraction)
+        saturation.postConcat(plateMatrix)
+        return saturation
+    }
+
     private fun applyEffects() {
         if (renderer == null) {
+            val fraction = intensity / 100f
+            val material = resolveMaterial()
+            val sigma = (customBlurRadius ?: material.blurRadius) * fraction * density / SOFTWARE_DOWNSCALE
+            softwareRadius = sigma.coerceIn(0f, 24f)
+            softwareFilter = if (softwareRadius > 0.5f) {
+                ColorMatrixColorFilter(materialColorMatrix(material, fraction))
+            } else {
+                null
+            }
             updateFallbackPlate()
+            syncSurfaceMirrors()
+            syncWindowMirror()
             return
         }
 
@@ -798,8 +845,9 @@ class BlurView(context: Context) : ReactViewGroup(context) {
         applyChildEffects()
     }
 
-    // Android 11 and below have no RenderEffect. Draw an opaque-enough plate
-    // in the material's colour so content on top stays readable.
+    // Used when there is no blur to draw on API 30 and below (the blur is off
+    // or the view cannot be captured yet). An opaque-enough plate in the
+    // material's colour keeps content on top readable.
     private fun updateFallbackPlate() {
         val fraction = intensity / 100f
         val material = resolveMaterial()
@@ -831,7 +879,7 @@ class BlurView(context: Context) : ReactViewGroup(context) {
         } else {
             val renderer = renderer
             if (renderer == null) {
-                super.dispatchDraw(canvas)
+                if (!drawSoftwareContent(canvas)) super.dispatchDraw(canvas)
             } else {
                 renderer.drawContent(
                     canvas, width, height, appliedEffect,
@@ -850,7 +898,7 @@ class BlurView(context: Context) : ReactViewGroup(context) {
     private fun drawChildren(canvas: Canvas) = super.dispatchDraw(canvas)
 
     private fun drawTint(canvas: Canvas) {
-        if (renderer == null && Color.alpha(fallbackPaint.color) > 0) {
+        if (renderer == null && !softwareDrawn && Color.alpha(fallbackPaint.color) > 0) {
             canvas.drawPath(cornerPath, fallbackPaint)
         }
         if (Color.alpha(tintPaint.color) > 0) {
@@ -859,11 +907,15 @@ class BlurView(context: Context) : ReactViewGroup(context) {
     }
 
     private fun drawBackdrop(canvas: Canvas) {
-        val renderer = renderer ?: return
         // A BlurView drawn inside another BlurView's backdrop capture does not
         // capture its own backdrop: that would re-run every nested capture and
         // grows exponentially with the number of overlapping BlurViews.
         if (captureDepth > 0) return
+        val renderer = renderer
+        if (renderer == null) {
+            drawSoftwareBackdrop(canvas)
+            return
+        }
         val effect = blurEffect ?: return
         if (!canvas.isHardwareAccelerated || width <= 0 || height <= 0) return
         val settled = settledBackdrop
@@ -903,6 +955,120 @@ class BlurView(context: Context) : ReactViewGroup(context) {
             parent = child.parent as? ViewGroup
         }
         return false
+    }
+
+    // The downscaled bitmap the software blur draws into, cleared and ready.
+    private fun softwareTarget(): Pair<Bitmap, Canvas>? {
+        if (width <= 0 || height <= 0) return null
+        val w = (width / SOFTWARE_DOWNSCALE).coerceAtLeast(1)
+        val h = (height / SOFTWARE_DOWNSCALE).coerceAtLeast(1)
+        val bitmap = softwareBitmap?.takeIf { it.width == w && it.height == h }
+            ?: Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888).also { softwareBitmap = it }
+        val bitmapCanvas = softwareCanvas ?: Canvas(bitmap).also { softwareCanvas = it }
+        bitmap.eraseColor(Color.TRANSPARENT)
+        return bitmap to bitmapCanvas
+    }
+
+    private fun drawSoftwareResult(canvas: Canvas, bitmap: Bitmap) {
+        boxBlur(bitmap, softwareRadius.toInt().coerceIn(1, 24))
+        softwarePaint.colorFilter = softwareFilter
+        softwareDest.set(0f, 0f, width.toFloat(), height.toFloat())
+        canvas.drawBitmap(bitmap, null, softwareDest, softwarePaint)
+        softwareDrawn = true
+    }
+
+    // API 30 and below: capture the backdrop into a small bitmap, blur it on
+    // the CPU and draw it scaled back up.
+    private fun drawSoftwareBackdrop(canvas: Canvas) {
+        softwareDrawn = false
+        val radius = softwareRadius
+        if (radius < 0.5f) return
+        val (bitmap, bitmapCanvas) = softwareTarget() ?: return
+        val saved = bitmapCanvas.save()
+        bitmapCanvas.scale(1f / SOFTWARE_DOWNSCALE, 1f / SOFTWARE_DOWNSCALE)
+        captureDepth++
+        try {
+            captureBackdrop(bitmapCanvas)
+        } finally {
+            captureDepth--
+            bitmapCanvas.restoreToCount(saved)
+        }
+        drawSoftwareResult(canvas, bitmap)
+    }
+
+    // API 30 and below, content mode: draw the children into the small bitmap,
+    // blur it and draw that instead of the sharp children.
+    private fun drawSoftwareContent(canvas: Canvas): Boolean {
+        softwareDrawn = false
+        val radius = softwareRadius
+        if (radius < 0.5f) return false
+        val (bitmap, bitmapCanvas) = softwareTarget() ?: return false
+        val saved = bitmapCanvas.save()
+        bitmapCanvas.scale(1f / SOFTWARE_DOWNSCALE, 1f / SOFTWARE_DOWNSCALE)
+        try {
+            drawChild(bitmapCanvas, blurContent, drawingTime)
+        } finally {
+            bitmapCanvas.restoreToCount(saved)
+        }
+        drawSoftwareResult(canvas, bitmap)
+        return true
+    }
+
+    // Three box blur passes approximate a Gaussian closely enough at this
+    // size, without RenderScript or any other dependency.
+    private fun boxBlur(bitmap: Bitmap, radius: Int) {
+        val w = bitmap.width
+        val h = bitmap.height
+        if (radius < 1 || w < 2 || h < 2) return
+        val pixels = IntArray(w * h)
+        bitmap.getPixels(pixels, 0, w, 0, 0, w, h)
+        val scratch = IntArray(w * h)
+        var src = pixels
+        var dst = scratch
+        repeat(3) {
+            blurPass(src, dst, w, h, true, radius)
+            blurPass(dst, src, w, h, false, radius)
+        }
+        bitmap.setPixels(src, 0, w, 0, 0, w, h)
+    }
+
+    private fun blurPass(
+        src: IntArray,
+        dst: IntArray,
+        w: Int,
+        h: Int,
+        horizontal: Boolean,
+        radius: Int,
+    ) {
+        val lines = if (horizontal) h else w
+        val length = if (horizontal) w else h
+        val step = if (horizontal) 1 else w
+        val base = if (horizontal) w else 1
+        val divisor = radius * 2 + 1
+        for (line in 0 until lines) {
+            val start = line * base
+            var a = 0
+            var r = 0
+            var g = 0
+            var b = 0
+            for (offset in -radius..radius) {
+                val color = src[start + offset.coerceIn(0, length - 1) * step]
+                a += color ushr 24 and 0xFF
+                r += color ushr 16 and 0xFF
+                g += color ushr 8 and 0xFF
+                b += color and 0xFF
+            }
+            for (index in 0 until length) {
+                dst[start + index * step] = (a / divisor shl 24) or
+                    (r / divisor shl 16) or (g / divisor shl 8) or (b / divisor)
+                val out = src[start + (index - radius).coerceIn(0, length - 1) * step]
+                val into = src[start + (index + radius + 1).coerceIn(0, length - 1) * step]
+                a += (into ushr 24 and 0xFF) - (out ushr 24 and 0xFF)
+                r += (into ushr 16 and 0xFF) - (out ushr 16 and 0xFF)
+                g += (into ushr 8 and 0xFF) - (out ushr 8 and 0xFF)
+                b += (into and 0xFF) - (out and 0xFF)
+            }
+        }
     }
 
     private fun captureBackdrop(canvas: Canvas) {
