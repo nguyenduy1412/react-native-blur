@@ -157,9 +157,52 @@ class BlurView(context: Context) : ReactViewGroup(context) {
         surfaceMirrors.values.forEach(::syncSurfaceAlpha)
         // Re-capture the backdrop every frame, but only while this view is on
         // screen; a long list can hold many BlurViews that are scrolled away.
-        if (backdropMode && blurEffect != null && getGlobalVisibleRect(selfRect)) invalidate()
+        if (backdropMode && blurEffect != null && getGlobalVisibleRect(selfRect)) {
+            postOnAnimation(backdropInvalidate)
+        }
         true
     }
+
+    // Redraws this view so the backdrop is captured again. It runs at the
+    // start of the next frame rather than from the pre-draw callback: a redraw
+    // forced from there while a screen transition was starting made Android
+    // draw the window background for a frame (a white flash), and the backdrop
+    // captured mid-transition came out white.
+    private val backdropInvalidate = Runnable {
+        if (backdropMode && blurEffect != null && getGlobalVisibleRect(selfRect) && !isScreenTransitioning()) {
+            invalidate()
+        }
+    }
+
+    // True while a screen transition animates the window. React Native Screens
+    // starts a view animation on the root view of each fragment, which is in a
+    // sibling branch of the window: on Android 12 this view can already be
+    // detached from its screen, so the search starts from the window itself.
+    // Only screen-sized views count: a small looping animation in the app must
+    // not freeze the backdrop.
+    private fun isScreenTransitioning(): Boolean {
+        val root = ((context as? ReactContext)?.currentActivity)?.window?.decorView ?: rootView
+        val minWidth = root.width * 3 / 4
+        val minHeight = root.height * 3 / 4
+        fun animated(view: View): Boolean {
+            if (view.animation != null && view.width >= minWidth && view.height >= minHeight) return true
+            if (view is ViewGroup) {
+                for (index in 0 until view.childCount) {
+                    val child = view.getChildAt(index) ?: continue
+                    if (animated(child)) return true
+                }
+            }
+            return false
+        }
+        return animated(root)
+    }
+
+    // The node holding the last recorded backdrop. While a screen transition
+    // runs, React Native detaches the screen's content for a few frames; a
+    // capture taken then contains only the white background of the screen,
+    // which showed as a white plate. The previous capture is kept until the
+    // content is back.
+    private var settledBackdrop: RenderNode? = null
 
     // Version-specific drawing (API 33+ or 31-32); null below API 31, where
     // there is no RenderEffect.
@@ -616,6 +659,7 @@ class BlurView(context: Context) : ReactViewGroup(context) {
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
+        settledBackdrop = null
         if (hasCorners) {
             invalidateOutline()
         }
@@ -822,6 +866,13 @@ class BlurView(context: Context) : ReactViewGroup(context) {
         if (captureDepth > 0) return
         val effect = blurEffect ?: return
         if (!canvas.isHardwareAccelerated || width <= 0 || height <= 0) return
+        val settled = settledBackdrop
+        if (settled != null && (isScreenTransitioning() || !hasContentBehind())) {
+            settled.setPosition(0, 0, width, height)
+            settled.setRenderEffect(effect)
+            canvas.drawRenderNode(settled)
+            return
+        }
         val node = renderer.backdropNode()
         node.setPosition(0, 0, width, height)
         val recording = node.beginRecording(width, height)
@@ -834,6 +885,24 @@ class BlurView(context: Context) : ReactViewGroup(context) {
         }
         node.setRenderEffect(effect)
         canvas.drawRenderNode(node)
+        settledBackdrop = node
+    }
+
+    // Whether a view painted before this one is visible. A screen that is
+    // being replaced can lose its content while the ancestor backgrounds are
+    // still there, and a capture of that draws a plain background.
+    private fun hasContentBehind(): Boolean {
+        var child: View = this
+        var parent = child.parent as? ViewGroup
+        while (parent != null) {
+            val branch = parent.indexOfChild(child)
+            for (index in 0 until branch) {
+                if (parent.getChildAt(index)?.visibility == View.VISIBLE) return true
+            }
+            child = parent
+            parent = child.parent as? ViewGroup
+        }
+        return false
     }
 
     private fun captureBackdrop(canvas: Canvas) {

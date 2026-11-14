@@ -100,9 +100,11 @@ internal class ModernBlurRenderer : BlurRenderer {
 
 /**
  * API 31-32. Android 12 keeps the blurred layer of a RenderNode or view with
- * a RenderEffect when only its contents change, so a reused node froze the
- * backdrop while scrolling and a blurred video stayed on its first frame.
- * Every frame records into a fresh node instead.
+ * a RenderEffect when only its contents change, so a node that is re-recorded
+ * keeps its first frame: the backdrop freezes while scrolling and a blurred
+ * video stays on its first frame. Recording into a new node for every frame
+ * avoids that, but it made a screen transition draw the window background (a
+ * white flash); two nodes used in turn avoid both.
  */
 @RequiresApi(Build.VERSION_CODES.S)
 internal class LegacyBlurRenderer : BlurRenderer {
@@ -111,7 +113,17 @@ internal class LegacyBlurRenderer : BlurRenderer {
     // API 37. The covering copy is slightly softer than the live video.
     override val coverDownscale = 2
 
-    override fun backdropNode(): RenderNode = RenderNode("blurBackdrop")
+    // Two nodes, used in turn: recording into the same node every frame makes
+    // Android 12 reuse its blurred layer (a frozen backdrop), while a new node
+    // for every frame made a screen transition draw the window background.
+    private val nodes = arrayOfNulls<RenderNode>(2)
+    private var next = 0
+
+    override fun backdropNode(): RenderNode {
+        val index = next
+        next = (next + 1) % nodes.size
+        return nodes[index] ?: RenderNode("blurBackdrop").also { nodes[index] = it }
+    }
 
     // The effect is applied to a fresh node in drawContent instead.
     override fun applyContentEffect(content: View, effect: RenderEffect?) {
