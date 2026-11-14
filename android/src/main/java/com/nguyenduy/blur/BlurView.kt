@@ -21,6 +21,7 @@ import android.os.Build
 import android.os.Handler
 import android.os.HandlerThread
 import android.os.Looper
+import android.os.SystemClock
 import android.view.Choreographer
 import android.view.PixelCopy
 import android.view.SurfaceView
@@ -149,6 +150,7 @@ class BlurView(context: Context) : ReactViewGroup(context) {
     private var softwareRadius = 0f
     private var softwareFilter: ColorMatrixColorFilter? = null
     private var softwareDrawn = false
+    private var lastSoftwareFrame = 0L
     private val softwarePaint = Paint(Paint.FILTER_BITMAP_FLAG)
     private val softwareDest = RectF()
     private var backdropMode = false
@@ -185,6 +187,12 @@ class BlurView(context: Context) : ReactViewGroup(context) {
     // captured mid-transition came out white.
     private val backdropInvalidate = Runnable {
         if (hasBackdrop && getGlobalVisibleRect(selfRect) && !isScreenTransitioning()) {
+            // The CPU blur is expensive, and a redraw it forces can land on the
+            // frame a screen transition starts, which made the screen draw the
+            // window background. 30 fps leaves the frame budget free.
+            val now = SystemClock.uptimeMillis()
+            if (renderer == null && now - lastSoftwareFrame < 33L) return@Runnable
+            lastSoftwareFrame = now
             invalidate()
         }
     }
@@ -969,12 +977,16 @@ class BlurView(context: Context) : ReactViewGroup(context) {
         return bitmap to bitmapCanvas
     }
 
-    private fun drawSoftwareResult(canvas: Canvas, bitmap: Bitmap) {
-        boxBlur(bitmap, softwareRadius.toInt().coerceIn(1, 24))
+    private fun drawSoftwareGraphic(canvas: Canvas, bitmap: Bitmap) {
         softwarePaint.colorFilter = softwareFilter
         softwareDest.set(0f, 0f, width.toFloat(), height.toFloat())
         canvas.drawBitmap(bitmap, null, softwareDest, softwarePaint)
         softwareDrawn = true
+    }
+
+    private fun drawSoftwareResult(canvas: Canvas, bitmap: Bitmap) {
+        boxBlur(bitmap, softwareRadius.toInt().coerceIn(1, 24))
+        drawSoftwareGraphic(canvas, bitmap)
     }
 
     // API 30 and below: capture the backdrop into a small bitmap, blur it on
@@ -983,6 +995,18 @@ class BlurView(context: Context) : ReactViewGroup(context) {
         softwareDrawn = false
         val radius = softwareRadius
         if (radius < 0.5f) return
+        // Keep the last blurred frame while a screen transition runs or while
+        // the screen has no content behind this view: a capture taken then is
+        // a plain white background and showed as a white plate.
+        val previous = softwareBitmap
+        val w = (width / SOFTWARE_DOWNSCALE).coerceAtLeast(1)
+        val h = (height / SOFTWARE_DOWNSCALE).coerceAtLeast(1)
+        if (previous != null && previous.width == w && previous.height == h &&
+            (isScreenTransitioning() || !hasContentBehind())
+        ) {
+            drawSoftwareGraphic(canvas, previous)
+            return
+        }
         val (bitmap, bitmapCanvas) = softwareTarget() ?: return
         val saved = bitmapCanvas.save()
         bitmapCanvas.scale(1f / SOFTWARE_DOWNSCALE, 1f / SOFTWARE_DOWNSCALE)
