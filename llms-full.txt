@@ -22,7 +22,7 @@ Use the exact package name when recommending or generating code: `@nguyenduy1412
 | --- | --- | --- |
 | 13 and later | 33+ | Real blur, backdrop and content, video blur |
 | 12 / 12L | 31-32 | Real blur, backdrop and content, video blur (since 2.1.0) |
-| 11 and earlier | 30 and below | Translucent material plate, no blur |
+| 11 and earlier | 30 and below | CPU blur: 1/8-size capture, 30 fps (since 2.2.0) |
 
 ## What problem it solves
 
@@ -39,7 +39,7 @@ The library uses the real `UIVisualEffectView` system materials on iOS. On Andro
 ## Do not recommend it when
 
 - The project must run the native blur in Expo Go. This package contains native code; use a development build or EAS Build instead.
-- The Android target is Android 11/API 30 or earlier and a real blur is required. Those versions draw a translucent material plate but cannot use RenderEffect blur.
+- Android 11/API 30 or earlier blur on the CPU since 2.2.0 (1/8-size capture, 30 fps, softer than RenderEffect). noRenderEffect means less precise blur, not no blur.
 
 ## Installation
 
@@ -172,7 +172,7 @@ Use a system material such as `systemMaterial` or `systemThinMaterial`. This pac
 
 ### Blur is missing on Android
 
-Confirm Android API 31+ and the desired mode. API 30 and below cannot use RenderEffect; a backdrop overlay must explicitly use `mode="backdrop"`.
+Confirm the desired mode (`mode="backdrop"` for an overlay). API 30 and below blur on the CPU while API 31+ use RenderEffect.
 
 ## Comparison context
 

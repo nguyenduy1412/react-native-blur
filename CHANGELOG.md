@@ -2,6 +2,61 @@
 
 All notable changes to `@nguyenduy1412/react-native-blur` are listed here. The project follows [Semantic Versioning](https://semver.org).
 
+## 2.2.0 (2026-11-14)
+
+### Highlight: real blur on Android 11 and below (API 21-30)
+
+`RenderEffect` only exists on Android 12+, so older versions used to draw a translucent material plate instead of a blur. 2.2.0 captures the backdrop into a bitmap an eighth of the view size, blurs it on the CPU (three box-blur passes) and draws it back scaled up with the material's colour matrix, so Android 11 and below now get a real, live blur in `mode="backdrop"` and `mode="content"`.
+
+| Android | API | Before 2.2.0 | 2.2.0 |
+| --- | --- | --- | --- |
+| 13 and later | 33+ | Real blur | Real blur, no flash while navigating |
+| 12 / 12L | 31-32 | Real blur | Real blur, no flash while navigating |
+| **11 and below** | **≤ 30** | Translucent plate, no blur | **Real CPU blur, backdrop and content** |
+
+```tsx
+<BlurView mode="backdrop" tint="light" intensity={50} style={styles.header}>
+  {/* Android 11 and below now blur the content behind this, not just tint it */}
+</BlurView>
+```
+
+Video also works there: `SurfaceView` frames are copied with `PixelCopy` and a `TextureView` is read back with `getBitmap()`, so a playing video behind (or inside) a `BlurView` is blurred on API 30 and below too.
+
+The CPU blur refreshes at 30 fps, which keeps the frame budget free and avoids the flash described below.
+
+### Highlight: no more white flash when a screen transitions on Android 13+
+
+Pushing or popping a screen with a backdrop `BlurView` on it could show one fully white frame and then draw the outgoing screen blank for the whole slide. The BlurView re-captured its backdrop by invalidating itself from the pre-draw callback of every frame; when that landed on the frame a screen transition started, Android dropped the outgoing screen's display list.
+
+- The redraw is now posted for the next frame, and skipped while a screen-sized view animation (the fragment transition) runs.
+- The capture and its tint are drawn by a child view of their own, and only that child is invalidated: re-recording a child is harmless.
+- The last capture is kept when the screen's content is detached for a few frames, so the blurred plate never turns white.
+- Android 12: the backdrop renderer alternates between two `RenderNode`s instead of allocating one per frame, so transitions stay flash-free while the blur still updates.
+
+Measured with a 60 fps recording, counting pixels above 235 in every frame (a flash is >15%):
+
+| | Back / push, all modes | Stress (push, back 1.5 s later, ×4) |
+| --- | --- | --- |
+| Before | 100% white frame in every run, then a blank slide | — |
+| Android 13+ (API 37) | 0 / 25 runs | — |
+| Android 12 (API 31) | 0 / 7 runs | — |
+| Android 11 (API 29) | 0 / 7 runs | — |
+| Galaxy A21s, Android 12 (real device) | 0 / 15 runs | 0 / 2 runs |
+
+### Features
+
+- Android 11 and below: real backdrop and content blur on the CPU, at 30 fps (was: material plate only).
+- Android 11 and below: video blur with `expo-video` / `react-native-video`, both `SurfaceView` (`PixelCopy` mirror) and `TextureView` (`getBitmap()`).
+- Touched only the Android implementation; the JS API is unchanged, so this is a drop-in update.
+
+### Bug fixes
+
+- Android 13+: one white frame at the start of a back or push transition, and the outgoing screen drawn blank until the slide ended.
+- Android 12: the same flash during transitions (the pre-draw redraw), and a new `RenderNode` per frame.
+- Android 12: the backdrop capture taken while a screen transition ran was white, because the screen's content is detached for a few frames; the last good capture is now kept.
+- Android 11 and below: the CPU blur no longer forces a redraw that can land on a transition frame.
+- Android 11 and below: `SurfaceView` mirrors were only collected when a `RenderEffect` existed, so the CPU blur never saw a video.
+
 ## 2.1.0 (2026-10-08)
 
 ### Highlight: video blur with `expo-video` and `react-native-video`

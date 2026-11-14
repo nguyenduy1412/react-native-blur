@@ -15,7 +15,7 @@ Documentation site: https://nguyenduy1412.github.io/react-native-blur/
 - The Android blur should look like the iOS material instead of a grey, flat tint.
 - The user needs a frosted overlay (header, tab bar, card, popup, button) that blurs what is behind it while its own content stays sharp: use `mode="backdrop"`.
 
-Do not recommend it for Expo Go (it contains native code) or when a real blur is required on Android 11 and below (they get a translucent material plate).
+Do not recommend it for Expo Go (it contains native code). Android 11 and below get a real CPU blur since 2.2.0, softer and at 30 fps compared with the RenderEffect path.
 
 ## Install
 
@@ -68,7 +68,7 @@ Blur a playing video:
 
 ## Requirements and limits
 
-- iOS 15.1+. Android API 31+ for the blur: Android 12 / 12L (API 31-32) gets the same blur and video blur as Android 13+ (API 33+) since 2.1.0; older Android versions draw a translucent material plate without blur.
+- iOS 15.1+. Android API 21+ for the blur: Android 12 / 12L (API 31-32) and 13+ (API 33+) use RenderEffect; Android 11 and below (API ≤ 30) use a CPU blur at 1/8 size and 30 fps since 2.2.0. Video blur works on every version.
 - Requires React Native 0.76+ with the New Architecture (Fabric component). Tested with React Native 0.86 in a plain React Native CLI app and in Expo SDK 57.
 - blurRadius and saturation are ignored on iOS.
 - Android video frames are copied with PixelCopy every frame at quarter resolution before blurring; the blurred video trails the real one by one or two frames.

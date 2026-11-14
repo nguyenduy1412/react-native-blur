@@ -32,7 +32,7 @@ Blur what is behind headers, tab bars, cards, popups and buttons while their con
 >
 > ### 🤖 Android 12 (API 31-32) fully supported, not only API 33+
 >
-> Android 12 / 12L now gets real backdrop blur, content blur and video blur like Android 13+, with its own renderer: no more frozen backdrop while scrolling, no more black video. Android 11 and below get a readable material plate.
+> Android 12 / 12L gets real backdrop blur, content blur and video blur like Android 13+, with its own renderer: no more frozen backdrop while scrolling, no more black video. Android 11 and below now blur too: the backdrop is captured into a small bitmap and blurred on the CPU, video included. No more white flash when pushing or popping a screen.
 >
 > Also new: backdrop inside `<Modal>` on Android, per-corner radii, any `tintColor`, and Reanimated `intensity`. See the [changelog](./CHANGELOG.md).
 
@@ -88,7 +88,7 @@ bun add @nguyenduy1412/react-native-blur
 | --- | --- |
 | React Native | 0.76 with the New Architecture (Fabric). Tested with React Native 0.86. |
 | iOS | 15.1 |
-| Android | API 31 (Android 12) for the blur: Android 12 / 12L (API 31-32) and 13+ (API 33+) get the same blur and video blur. Older versions draw a translucent material plate without blur, so content stays readable. |
+| Android | API 21+. Android 12 / 12L (API 31-32) and 13+ (API 33+) use `RenderEffect`; Android 11 and below (API ≤ 30) use a CPU blur captured at 1/8 size and refreshed at 30 fps. Backdrop, content and video blur work on all of them. |
 | Expo (optional) | Tested with Expo SDK 57 |
 
 ## Quick start
@@ -320,6 +320,8 @@ Accepts every `View` prop, plus:
 
 **Android (API 31+).** In content mode the view applies a `RenderEffect` chain to its children: a Gaussian blur, then a `ColorMatrix` that restores the brightness and saturation the blur removes and lays down the material's tint plate. The material numbers come from Apple's own `.materialrecipe` files in the iOS runtime, and the Android output was checked against colours sampled from iOS screenshots.
 
+**Android 11 and below (API ≤ 30).** There is no `RenderEffect`, so the backdrop (or the children, in content mode) is drawn into a bitmap an eighth of the view size, blurred with three box-blur passes on the CPU, and drawn back scaled up with the same colour matrix, 30 times a second.
+
 **Video on Android.** A `SurfaceView` is composited by the system, outside the normal view hierarchy, so no `RenderEffect` can reach it. The view finds `SurfaceView`s among its children, copies their frames with `PixelCopy` (downscaled 4×, every frame) and draws the copy in their place, where the blur applies like it does to everything else.
 
 **Backdrop mode.** On iOS the effect view is placed underneath the children, so `UIVisualEffectView` blurs whatever is behind the `BlurView`. On Android the view records what is drawn behind it (ancestor backgrounds and the sibling views before it, with their scroll offsets and transforms) into a `RenderNode`, applies the same blur and material chain, and draws the children on top. The recording is refreshed on every frame where something on screen changed, so scrolling lists and playing videos stay in sync.
@@ -328,7 +330,7 @@ Accepts every `View` prop, plus:
 
 ## Limitations
 
-- **Android 11 and below** have no `RenderEffect`, so they draw a translucent plate in the material's colour instead of a blur.
+- **Android 11 and below** blur on the CPU: the capture is an eighth of the view size and refreshes at 30 fps, so the blur is softer and updates less often than the `RenderEffect` path. It also costs more CPU on those devices.
 - **60 fps `SurfaceView` video under a backdrop** is shown at the copy rate while `syncVideo` is on. Use `syncVideo={false}`, or a `TextureView` player (expo-video `surfaceType="textureView"`, react-native-video 7 `surfaceType="texture"`), which needs no copy at all.
 - **`blurRadius` and `saturation`** are ignored on iOS, which uses the system material as is.
 - **Video copies on Android** are made at quarter resolution, as fast as `PixelCopy` returns them (usually the video's own frame rate). The blurred video trails the real one by one or two frames, which you can notice where sharp and blurred video sit side by side.
@@ -379,7 +381,7 @@ A single Gaussian blur plus a flat tint washes out the colours. This library reb
 Check two things:
 
 1. **Use `mode="backdrop"` for overlays.** The default `mode="content"` blurs the view's own children, so a `BlurView` laid over other views has nothing of its own to blur. `mode="backdrop"` blurs what is behind it.
-2. **The device must run Android 12 (API 31) or later.** `RenderEffect` does not exist on older versions, so they get a translucent material plate instead of a blur.
+2. **Android 11 and below use a CPU blur.** It is on by default, but only refreshes at 30 fps and is softer than the `RenderEffect` path; if you see a plate instead, check that `intensity` is above 0 and `mode` matches how you use the view.
 
 </details>
 
